@@ -109,6 +109,36 @@ npm run lint
 npm run format
 ```
 
+## Example Usage
+
+### Basic Decision Making
+```
+User: "I need to decide between React and Vue for my new project"
+AI: Uses decision_start_process to create a structured decision, then decision_gather_evidence to collect pros/cons, finally decision_choose_option based on analysis
+```
+
+### Market Research
+```
+User: "Should we launch this product in Q1 or Q2?"
+AI: Uses tribeunal_list_tribes to find relevant expert communities, decision_start_process for the timing decision, decision_provide_info with market data
+```
+
+### Technical Architecture
+```
+User: "Help me choose between microservices and monolith architecture"
+AI: Uses decision_start_process with technical template, decision_gather_evidence for architecture patterns, decision_check_consensus for team alignment
+```
+
+### Community Engagement
+```
+User: "Find experts in machine learning to help with my AI project decision"
+AI: Uses tribeunal_list_tribes to find ML communities, tribeunal_get_tribe for expertise details, tribeunal_join_tribe to connect with experts
+```
+
+## Related Projects
+
+**Main Tribeunal Platform**: [pentarim/tribeunal](https://github.com/pentarim/tribeunal) - The core web application and API that this MCP server connects to.
+
 ## API Documentation
 
 For detailed API documentation, see the [docs](./docs) directory.
