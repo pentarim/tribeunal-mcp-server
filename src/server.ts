@@ -58,6 +58,17 @@ import {
   GetUserSchema,
 } from './tools/users.js';
 
+import {
+  JuryDutyStatusSchema,
+  JuryDutyAllowanceSchema,
+  JuryDutyDashboardSchema,
+  JuryDutyStartSchema,
+  JuryDutyCancelSchema,
+  JuryDutyAcceptSchema,
+  JuryDutyRejectSchema,
+  JuryDutyHistorySchema,
+} from './tools/jury-duty.js';
+
 export function setupTools(server: Server): void {
   // Set up unified tool call handler
   server.setRequestHandler(
@@ -112,9 +123,9 @@ export function setupTools(server: Server): void {
                   text: `Decision process started successfully!
   
 UUID: ${trial.uuid}
-URL: ${trial.url || `https://tribeunal.test/cases/${trial.uuid}/${trial.slug}`}
+URL: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
 
-You can view and participate in the decision at: ${trial.url || `https://tribeunal.test/cases/${trial.uuid}/${trial.slug}`}
+You can view and participate in the decision at: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
 
 Full response:
 ${JSON.stringify(trial, null, 2)}`,
@@ -196,9 +207,9 @@ ${JSON.stringify(trial, null, 2)}`,
                   text: `Trial created successfully!
   
 UUID: ${trial.uuid}
-URL: ${trial.url || `https://tribeunal.test/cases/${trial.uuid}/${trial.slug}`}
+URL: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
 
-You can view and share the trial at: ${trial.url || `https://tribeunal.test/cases/${trial.uuid}/${trial.slug}`}
+You can view and share the trial at: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
 
 Full response:
 ${JSON.stringify(trial, null, 2)}`,
@@ -353,6 +364,86 @@ ${JSON.stringify(trial, null, 2)}`,
             const user = await apiClient.getCurrentUser();
             return {
               content: [{ type: 'text', text: JSON.stringify(user, null, 2) }],
+            };
+          }
+
+          // Jury Duty tools
+          case 'tribeunal_jury_duty_status': {
+            const status = await apiClient.getJuryDutyStatus();
+            return {
+              content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_allowance': {
+            const allowance = await apiClient.getJuryDutyAllowance();
+            return {
+              content: [{
+                type: 'text',
+                text: `Jury Duty Allowance:\nDaily: ${allowance.allowance?.used_today ?? '?'}/${allowance.allowance?.daily_max ?? '?'} used (${allowance.allowance?.remaining_today ?? '?'} remaining)\nActive Juries: ${allowance.allowance?.active_jury_duties ?? '?'}/${allowance.allowance?.max_active_jury_duties ?? '?'}\nCan Start: ${allowance.allowance?.can_use ? 'Yes' : 'No'}\nResets: ${allowance.allowance?.reset_time ?? 'midnight'}\n\n${JSON.stringify(allowance, null, 2)}`,
+              }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_dashboard': {
+            const dashboard = await apiClient.getJuryDutyDashboard();
+            const assignments = dashboard.current_assignments || [];
+            const total = dashboard.assignments_total || 0;
+            return {
+              content: [{
+                type: 'text',
+                text: `Jury Duty Dashboard:\nTotal Assignments: ${total}\nShowing: ${assignments.length} recent assignments\nActive Request: ${dashboard.active_request ? 'Yes (status: ' + dashboard.active_request.status + ')' : 'None'}\n\nAllowance:\n  Daily: ${dashboard.allowance?.used_today ?? '?'}/${dashboard.allowance?.daily_max ?? '?'} (${dashboard.allowance?.remaining_today ?? '?'} remaining)\n  Active Juries: ${dashboard.allowance?.active_jury_duties ?? '?'}/${dashboard.allowance?.max_active_jury_duties ?? '?'}\n\n${JSON.stringify(dashboard, null, 2)}`,
+              }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_start': {
+            const result = await apiClient.startJuryDuty();
+            return {
+              content: [{
+                type: 'text',
+                text: `Jury duty request created!\nStatus: ${result.request?.status || 'waiting'}\nAllowance Remaining: ${result.allowance?.remaining_today ?? '?'}\n\n${JSON.stringify(result, null, 2)}`,
+              }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_cancel': {
+            const result = await apiClient.cancelJuryDuty();
+            return {
+              content: [{
+                type: 'text',
+                text: `Jury duty request cancelled. Allowance refunded (if same day).\n\n${JSON.stringify(result, null, 2)}`,
+              }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_accept': {
+            const params = JuryDutyAcceptSchema.parse(args);
+            const result = await apiClient.acceptJuryDuty(params.memberId);
+            return {
+              content: [{
+                type: 'text',
+                text: `Jury duty accepted! Trial: ${result.trial?.title || 'Unknown'}\nURL: ${result.trial?.url || 'N/A'}\n\n${JSON.stringify(result, null, 2)}`,
+              }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_reject': {
+            const params = JuryDutyRejectSchema.parse(args);
+            const result = await apiClient.rejectJuryDuty(params.memberId);
+            return {
+              content: [{
+                type: 'text',
+                text: `Jury duty rejected. Searching for another case...\n\n${JSON.stringify(result, null, 2)}`,
+              }],
+            };
+          }
+
+          case 'tribeunal_jury_duty_history': {
+            const params = JuryDutyHistorySchema.parse(args);
+            const history = await apiClient.getJuryDutyHistory(params.days);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(history, null, 2) }],
             };
           }
 
@@ -698,6 +789,79 @@ ${JSON.stringify(trial, null, 2)}`,
             inputSchema: {
               type: 'object',
               properties: {},
+            },
+          },
+          // Jury Duty tools
+          {
+            name: 'tribeunal_jury_duty_status',
+            description: 'Get current jury duty request status, queue position, and whether user has an active search or assignment',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_allowance',
+            description: 'Get daily jury duty allowance info — how many requests used/remaining today, active jury count vs limit, and reset time',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_dashboard',
+            description: 'Get jury duty dashboard with current trial assignments (cases to vote on), allowance info, and active request status. Best tool for finding trials assigned to you.',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_start',
+            description: 'Start a jury duty search — join the matchmaking queue to be assigned to a trial needing jurors. Consumes 1 daily allowance.',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_cancel',
+            description: 'Cancel an active jury duty search request. Refunds daily allowance if cancelled on the same day.',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_accept',
+            description: 'Accept a jury duty assignment to serve on a specific trial',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                memberId: { type: 'string', description: 'Member ID from the jury assignment' },
+              },
+              required: ['memberId'],
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_reject',
+            description: 'Reject a jury duty assignment and return to the queue for a different trial',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                memberId: { type: 'string', description: 'Member ID from the jury assignment' },
+              },
+              required: ['memberId'],
+            },
+          },
+          {
+            name: 'tribeunal_jury_duty_history',
+            description: 'Get jury duty allowance usage history for the past N days (default 7, max 30)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                days: { type: 'number', minimum: 1, maximum: 30, default: 7, description: 'Number of days of history to retrieve' },
+              },
             },
           },
         ],

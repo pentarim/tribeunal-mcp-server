@@ -38,7 +38,7 @@ TRIBEUNAL_API_KEY=your_api_key_here
 
 ## Usage
 
-### Running the Server
+### Option 1: Stdio Server (Local)
 
 ```bash
 # Development mode with hot reload
@@ -49,12 +49,9 @@ npm run build
 npm start
 ```
 
-### Connecting with MCP Client
-
-The server supports both stdio and HTTP transports:
+#### Connecting with MCP Client
 
 ```javascript
-// Example client connection
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 const client = new Client({
@@ -62,12 +59,54 @@ const client = new Client({
   version: '1.0.0'
 });
 
-// Connect via stdio
 await client.connect({
   transport: 'stdio',
   command: 'node',
   args: ['path/to/tribeunal-mcp-server']
 });
+```
+
+### Option 2: Cloudflare Worker (Edge)
+
+Deploy the MCP tools as a Cloudflare Worker for edge-hosted access via `workers-mcp`.
+
+```bash
+cd worker
+
+# Install dependencies
+npm install
+
+# Generate shared secret
+npx workers-mcp secret generate
+
+# Deploy to Cloudflare
+npm run deploy
+
+# Upload secrets
+npx workers-mcp secret upload
+npx wrangler secret put TRIBEUNAL_API_BASE_URL
+npx wrangler secret put TRIBEUNAL_API_KEY
+```
+
+#### MCP Client Configuration
+
+Add to your `.mcp.json` or Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "tribeunal-worker": {
+      "command": "npx",
+      "args": [
+        "workers-mcp",
+        "run",
+        "tribeunal-worker",
+        "https://tribeunal-mcp-worker.<your-subdomain>.workers.dev",
+        "/path/to/mcp-server/worker"
+      ]
+    }
+  }
+}
 ```
 
 ## Available Tools
