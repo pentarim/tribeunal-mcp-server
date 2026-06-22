@@ -2,7 +2,8 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import dotenv from 'dotenv';
-import { setupTools } from './server.js';
+import { createApiClientFromEnv } from './client/from-env.js';
+import { registerTools } from './core/stdio-register.js';
 
 // Load environment variables
 dotenv.config();
@@ -20,8 +21,10 @@ const server = new Server(
   }
 );
 
-// Set up all tools
-setupTools(server);
+// Build the API client from the environment (legacy per-persona API key) and
+// register the transport-agnostic core tools against it.
+const apiClient = createApiClientFromEnv();
+registerTools(server, apiClient);
 
 // Error handling
 server.onerror = (error) => {

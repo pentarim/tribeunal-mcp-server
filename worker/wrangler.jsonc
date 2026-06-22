@@ -1,6 +1,71 @@
+/**
+ * Wrangler config for the Tribeunal remote MCP server.
+ * Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+ *
+ * Secrets are NOT stored here. Set them with `wrangler secret put <NAME>`:
+ *   AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_AUDIENCE,
+ *   COOKIE_ENCRYPTION_KEY   (see worker/README.md and .dev.vars.example)
+ */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "tribeunal-mcp-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-03-01"
+  "compatibility_date": "2025-04-01",
+  // axios + the shared core use a few Node built-ins (e.g. `https`); nodejs_compat
+  // provides the shims the Workers runtime needs.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Durable Object backing the McpAgent (one DO instance per MCP session).
+  // The binding name MUST be "MCP_OBJECT" — that is the default the agents SDK
+  // `McpAgent.serve()/serveSSE()` looks up.
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "TribeunalMCP",
+        "name": "MCP_OBJECT"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TribeunalMCP"]
+    }
+  ],
+
+  // KV namespace used by @cloudflare/workers-oauth-provider to persist grants,
+  // tokens, dynamically-registered clients, and our short-lived PKCE records.
+  // Create it with `wrangler kv namespace create OAUTH_KV` and paste the id here.
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "<REPLACE_WITH_OAUTH_KV_NAMESPACE_ID>"
+    }
+  ],
+
+  // Non-secret configuration. AUTH0_SCOPE and TRIBEUNAL_API_BASE_URL are not
+  // sensitive (per docs/AUTH0_CONTRACT.md §5.2) so they live here as plain vars.
+  // For local `wrangler dev` these are overridden by worker/.dev.vars.
+  "vars": {
+    "TRIBEUNAL_API_BASE_URL": "https://tribeunal.com/api",
+    "AUTH0_SCOPE": "openid profile email offline_access read:trials create:trials vote:cast vote:revoke submit:evidence rate:evidence manage:tribes jury:duty read:profile"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  "dev": {
+    "port": 8788
+  }
+
+  // ---------------------------------------------------------------------------
+  // Custom domain (decision 4a: mcp.tribeunal.com). Uncomment once the zone is
+  // on this Cloudflare account and the worker has been deployed at least once.
+  // A custom domain auto-provisions the edge cert and routes the apex path.
+  //
+  // "routes": [
+  //   { "pattern": "mcp.tribeunal.com", "custom_domain": true }
+  // ]
+  // ---------------------------------------------------------------------------
 }

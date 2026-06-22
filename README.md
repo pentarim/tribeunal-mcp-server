@@ -66,44 +66,36 @@ await client.connect({
 });
 ```
 
-### Option 2: Cloudflare Worker (Edge)
+### Option 2: Remote MCP Server on Cloudflare (Auth0-authenticated)
 
-Deploy the MCP tools as a Cloudflare Worker for edge-hosted access via `workers-mcp`.
+The `worker/` directory hosts a **remote** MCP server on Cloudflare Workers that
+authenticates each caller via **Auth0** and runs every tool call **as that user**
+(not a shared key). It exposes the same tools as the stdio server — they share a
+transport-agnostic core (`src/core/tools.ts`, `src/client/api-client.ts`).
+
+Full setup, deploy steps, Auth0 app requirements, and the required secrets are in
+**[`worker/README.md`](./worker/README.md)**. The authoritative Auth0 contract
+(audience, scopes, env-var names, callback URLs, token shape) lives in the app
+repo at `app/docs/AUTH0_CONTRACT.md`.
 
 ```bash
 cd worker
-
-# Install dependencies
 npm install
-
-# Generate shared secret
-npx workers-mcp secret generate
-
-# Deploy to Cloudflare
-npm run deploy
-
-# Upload secrets
-npx workers-mcp secret upload
-npx wrangler secret put TRIBEUNAL_API_BASE_URL
-npx wrangler secret put TRIBEUNAL_API_KEY
+cp .dev.vars.example .dev.vars   # fill in Auth0 values; see worker/README.md
+npx wrangler types               # regenerate Cloudflare runtime types
+npx wrangler deploy --dry-run --outdir /tmp/wkr   # validate without deploying
 ```
 
-#### MCP Client Configuration
+#### MCP Client Configuration (mcp-remote bridge)
 
 Add to your `.mcp.json` or Claude Desktop config:
 
 ```json
 {
   "mcpServers": {
-    "tribeunal-worker": {
+    "tribeunal": {
       "command": "npx",
-      "args": [
-        "workers-mcp",
-        "run",
-        "tribeunal-worker",
-        "https://tribeunal-mcp-worker.<your-subdomain>.workers.dev",
-        "/path/to/mcp-server/worker"
-      ]
+      "args": ["mcp-remote", "https://mcp.tribeunal.com/sse"]
     }
   }
 }

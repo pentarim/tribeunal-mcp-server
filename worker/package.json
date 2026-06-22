@@ -2,17 +2,26 @@
   "name": "@pentarim/tribeunal-mcp-worker",
   "version": "1.0.0",
   "private": true,
+  "description": "Remote, Auth0-authenticated Tribeunal MCP server on Cloudflare Workers",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "workers-mcp docgen src/index.ts && wrangler deploy",
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev",
+    "type-check": "tsc --noEmit",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "workers-mcp": "^0.0.1"
+    "@cloudflare/workers-oauth-provider": "^0.8.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.16.2",
+    "axios": "^1.6.2",
+    "hono": "^4.12.26",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241230.0",
+    "@cloudflare/workers-types": "^4.20260613.1",
+    "@types/node": "^20.10.0",
     "typescript": "^5.3.0",
-    "wrangler": "^4.70.0"
+    "wrangler": "^4.103.0"
   }
 }
