@@ -1,6 +1,4 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import https from 'https';
-import { z } from 'zod';
 
 export class TribeunalAPIError extends Error {
   constructor(
@@ -13,34 +11,59 @@ export class TribeunalAPIError extends Error {
   }
 }
 
+export interface TribeunalAPIClientConfig {
+  /** Base URL of the Tribeunal API, e.g. https://tribeunal.com/api */
+  baseURL: string;
+  /**
+   * Bearer token sent as `Authorization: Bearer <token>` on every request.
+   * For the stdio/persona path this is a legacy API key; for the Cloudflare
+   * worker path this is the per-user Auth0 access token.
+   */
+  bearerToken?: string;
+  /**
+   * Optional pre-built Node `https.Agent` (typed loosely so this file carries no
+   * dependency on Node's type declarations and stays compilable in the
+   * Cloudflare Workers type environment). The stdio path injects one via
+   * `createApiClientFromEnv()` to control TLS verification; the worker omits it
+   * and lets the Workers runtime handle TLS.
+   */
+  httpsAgent?: unknown;
+}
+
 export class TribeunalAPIClient {
   private client: AxiosInstance;
-  private apiKey: string | undefined;
+  private bearerToken: string | undefined;
+  private baseOrigin: string;
 
-  constructor(baseURL: string = process.env.TRIBEUNAL_API_BASE_URL || 'https://tribeunal.test/api') {
-    this.apiKey = process.env.TRIBEUNAL_API_KEY;
-    
-    // Create HTTPS agent with optional certificate verification
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: process.env.TRIBEUNAL_VERIFY_SSL !== 'false'
-    });
-    
-    this.client = axios.create({
+  constructor(config: TribeunalAPIClientConfig) {
+    const { baseURL, bearerToken, httpsAgent } = config;
+    this.baseOrigin = new URL(baseURL).origin;
+    this.bearerToken = bearerToken;
+
+    const axiosConfig: Parameters<typeof axios.create>[0] = {
       baseURL,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       timeout: 30000,
-      httpsAgent: httpsAgent,
-    });
+    };
+
+    // The stdio path may inject a Node `https.Agent` (e.g. to allow the
+    // self-signed tribeunal.test cert in dev). On Cloudflare Workers no agent is
+    // passed and the runtime handles TLS natively.
+    if (httpsAgent) {
+      axiosConfig.httpsAgent = httpsAgent;
+    }
+
+    this.client = axios.create(axiosConfig);
 
     // Add auth interceptor
-    this.client.interceptors.request.use((config) => {
-      if (this.apiKey) {
-        config.headers['Authorization'] = `Bearer ${this.apiKey}`;
+    this.client.interceptors.request.use((requestConfig) => {
+      if (this.bearerToken) {
+        requestConfig.headers['Authorization'] = `Bearer ${this.bearerToken}`;
       }
-      return config;
+      return requestConfig;
     });
 
     // Add error interceptor
@@ -87,19 +110,23 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
-  // Vote endpoints
+  // Vote endpoints (these routes have no /api/ prefix)
   async castVote(trialId: string, sideId: string) {
-    const response = await this.client.post(`/cases/${trialId}/vote`, { side_id: sideId });
+    const params = new URLSearchParams();
+    params.append('side_id', sideId);
+    const response = await this.client.post(`${this.baseOrigin}/cases/${trialId}/vote`, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
     return response.data;
   }
 
   async revokeVote(trialId: string, voteId: string) {
-    const response = await this.client.delete(`/cases/${trialId}/vote/${voteId}`);
+    const response = await this.client.delete(`${this.baseOrigin}/cases/${trialId}/vote/${voteId}`);
     return response.data;
   }
 
   async getVoteStats(trialId: string) {
-    const response = await this.client.get(`/cases/${trialId}/votes`);
+    const response = await this.client.get(`${this.baseOrigin}/cases/${trialId}/votes`);
     return response.data;
   }
 
@@ -148,6 +175,47 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
+  // Jury Duty endpoints
+  async getJuryDutyStatus() {
+    const response = await this.client.get('/jury-duty/status');
+    return response.data;
+  }
+
+  async getJuryDutyAllowance() {
+    const response = await this.client.get('/jury-duty/allowance');
+    return response.data;
+  }
+
+  async getJuryDutyDashboard() {
+    const response = await this.client.get('/jury-duty/index');
+    return response.data;
+  }
+
+  async startJuryDuty() {
+    const response = await this.client.post('/jury-duty/start');
+    return response.data;
+  }
+
+  async cancelJuryDuty() {
+    const response = await this.client.delete('/jury-duty/cancel');
+    return response.data;
+  }
+
+  async acceptJuryDuty(memberId: string) {
+    const response = await this.client.post(`/jury-duty/accept/${memberId}`);
+    return response.data;
+  }
+
+  async rejectJuryDuty(memberId: string) {
+    const response = await this.client.post(`/jury-duty/reject/${memberId}`);
+    return response.data;
+  }
+
+  async getJuryDutyHistory(days: number = 7) {
+    const response = await this.client.get('/jury-duty/allowance/history', { params: { days } });
+    return response.data;
+  }
+
   // Evidence endpoints
   async getTrialEvidence(trialId: string) {
     const response = await this.client.get(`/cases/${trialId}/evidence`);
@@ -169,5 +237,3 @@ export class TribeunalAPIClient {
   }
 }
 
-// Export singleton instance
-export const apiClient = new TribeunalAPIClient();

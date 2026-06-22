@@ -41,8 +41,31 @@ This is a **Model Context Protocol (MCP) Server** that provides programmatic acc
 3. API client in `src/client/api-client.ts` makes authenticated HTTP calls
 4. Responses formatted via `src/utils/format.ts`
 
+### Cloudflare Worker (`worker/`)
+
+An alternative deployment of the Tribeunal MCP tools as a Cloudflare Worker using `workers-mcp`.
+
+**Entry Point**: `worker/src/index.ts` - `WorkerEntrypoint` class with JSDoc-annotated methods
+**Config**: `worker/wrangler.jsonc` - Cloudflare Worker configuration
+**Docs Generation**: `workers-mcp docgen` parses JSDoc comments into MCP tool metadata
+
+Key differences from the stdio server:
+- Uses `fetch()` instead of `axios` (Workers runtime)
+- Auth via Cloudflare secrets (`TRIBEUNAL_API_KEY`, `TRIBEUNAL_API_BASE_URL`, `SHARED_SECRET`)
+- Methods return `string` (JSON-serialized) — required by `workers-mcp`
+- Tool definitions derived from JSDoc annotations, not Zod schemas
+- Deployed to Cloudflare's edge network
+
+#### Worker Commands
+- `cd worker && npm run dev` - Local development with Wrangler
+- `cd worker && npm run deploy` - Generate docs and deploy to Cloudflare
+- `cd worker && npx workers-mcp secret generate` - Generate shared secret
+- `cd worker && npx workers-mcp secret upload` - Upload shared secret to Cloudflare
+- `cd worker && npx wrangler secret put <NAME>` - Set environment secrets
+
 ### Error Handling
-- Custom `TribeunalAPIError` class for API errors
+- Custom `TribeunalAPIError` class for API errors (stdio server)
+- Workers throw errors with status code and response body
 - Comprehensive error propagation through MCP protocol
 - Request/response interceptors in API client
 
@@ -68,10 +91,12 @@ This is a **Model Context Protocol (MCP) Server** that provides programmatic acc
 - ESM modules throughout
 
 ### Key Dependencies
-- `@modelcontextprotocol/sdk` - MCP protocol implementation
-- `axios` - HTTP client
-- `zod` - Schema validation
-- `dotenv` - Environment management
+- `@modelcontextprotocol/sdk` - MCP protocol implementation (stdio server)
+- `workers-mcp` - Cloudflare Worker MCP integration (worker)
+- `axios` - HTTP client (stdio server)
+- `zod` - Schema validation (stdio server)
+- `dotenv` - Environment management (stdio server)
+- `wrangler` - Cloudflare Workers CLI (worker)
 
 ### Testing
 - Jest configured but no tests implemented yet

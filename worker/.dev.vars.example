@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+# Local development secrets for `wrangler dev` (the Tribeunal remote MCP worker).
+#
+# Copy this file to `worker/.dev.vars` (gitignored) and fill in real values.
+# In PRODUCTION these are NOT read from a file — set each one with:
+#     wrangler secret put <NAME>
+# (except AUTH0_SCOPE / TRIBEUNAL_API_BASE_URL, which are plain `vars` in
+#  wrangler.jsonc; override them here only if your local API/scopes differ.)
+#
+# Source of truth for every value: app/docs/AUTH0_CONTRACT.md §5.2.
+# ---------------------------------------------------------------------------
+
+# Auth0 tenant domain — NO scheme, NO trailing slash. e.g. tribeunal.eu.auth0.com
+AUTH0_DOMAIN=your-tenant.eu.auth0.com
+
+# "Tribeunal Remote MCP" application (Regular Web App) credentials.
+AUTH0_CLIENT_ID=your_auth0_client_id
+AUTH0_CLIENT_SECRET=your_auth0_client_secret
+
+# API audience. MUST equal the app's AUTH0_API_AUDIENCE byte-for-byte.
+# This is the #1 misconfiguration risk — a mismatch makes the API 401 silently.
+AUTH0_AUDIENCE=https://api.tribeunal.com
+
+# Space-delimited scopes requested from Auth0 (OIDC + the nine resource scopes).
+# Normally inherited from wrangler.jsonc `vars`; override locally only if needed.
+AUTH0_SCOPE=openid profile email offline_access read:trials create:trials vote:cast vote:revoke submit:evidence rate:evidence manage:tribes jury:duty read:profile
+
+# Base URL the TribeunalAPIClient targets. For local end-to-end testing this is
+# the cloudflared tunnel URL (real TLS) in front of tribeunal.test, e.g.
+#   https://<random>.trycloudflare.com/api
+# (CF Workers cannot reach the private, self-signed tribeunal.test directly.)
+TRIBEUNAL_API_BASE_URL=https://your-tunnel.trycloudflare.com/api
+
+# 32-byte random key used to sign the client-approval cookie.
+# Generate with: openssl rand -hex 32
+COOKIE_ENCRYPTION_KEY=replace_with_openssl_rand_hex_32
