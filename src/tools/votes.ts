@@ -21,7 +21,7 @@ export const ChangeChoiceSchema = z.object({
 // Alias for backward compatibility
 export const RevokeVoteSchema = z.object({
   trialId: z.string().describe('Trial ID'),
-  voteId: z.string().describe('Vote ID to revoke'),
+  sideId: z.string().describe('Side UUID whose vote to revoke (the API resolves the caller\'s vote by user+trial)'),
 });
 
 export const CheckConsensusSchema = z.object({
@@ -56,5 +56,6 @@ export const EvaluateInfoQualitySchema = z.object({
 // Alias for backward compatibility
 export const RateEvidenceSchema = z.object({
   evidenceId: z.string().describe('Evidence ID to rate'),
-  rating: z.number().min(1).max(5).describe('Rating from 1 to 5'),
+  rating: z.number().int().min(-1).max(1).describe('Rating: 1 (up), 0 (irrelevant), or -1 (down)'),
+  sideId: z.string().optional().describe('Optional side UUID this rating relates to'),
 });

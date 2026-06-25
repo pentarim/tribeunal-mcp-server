@@ -120,13 +120,16 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
-  async revokeVote(trialId: string, voteId: string) {
-    const response = await this.client.delete(`${this.baseOrigin}/cases/${trialId}/vote/${voteId}`);
+  async revokeVote(trialId: string, sideId: string) {
+    // The trailing segment is the SIDE uuid (the API looks up the caller's vote
+    // by (user, trial)); this vote route has no /api/ prefix.
+    const response = await this.client.delete(`${this.baseOrigin}/cases/${trialId}/vote/${sideId}`);
     return response.data;
   }
 
   async getVoteStats(trialId: string) {
-    const response = await this.client.get(`${this.baseOrigin}/cases/${trialId}/votes`);
+    // Served by GET /api/cases/{uuid}/votes (uses the /api baseURL, not baseOrigin).
+    const response = await this.client.get(`/cases/${trialId}/votes`);
     return response.data;
   }
 
@@ -231,8 +234,14 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
-  async rateEvidence(evidenceId: string, rating: number) {
-    const response = await this.client.post(`/evidence/${evidenceId}/rate`, { rating });
+  async rateEvidence(evidenceId: string, rating: number, sideId?: string) {
+    // rating is a domain value: 1 (up) / 0 (irrelevant) / -1 (down).
+    // Served by POST /api/evidence/{id}/rate.
+    const body: { rating: number; sideId?: string } = { rating };
+    if (sideId) {
+      body.sideId = sideId;
+    }
+    const response = await this.client.post(`/evidence/${evidenceId}/rate`, body);
     return response.data;
   }
 }

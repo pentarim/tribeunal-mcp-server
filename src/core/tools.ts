@@ -251,9 +251,9 @@ export const TOOL_DEFINITIONS = [
       type: 'object',
       properties: {
         trialId: { type: 'string', description: 'Trial ID' },
-        voteId: { type: 'string', description: 'Vote ID to revoke' },
+        sideId: { type: 'string', description: 'Side UUID whose vote to revoke (the API resolves the caller\'s vote by user+trial)' },
       },
-      required: ['trialId', 'voteId'],
+      required: ['trialId', 'sideId'],
     },
   },
   {
@@ -283,12 +283,13 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_rate_evidence',
-    description: 'Rate the quality of submitted evidence (1-5 stars)',
+    description: 'Rate submitted evidence: 1 (up), 0 (irrelevant), or -1 (down)',
     inputSchema: {
       type: 'object',
       properties: {
         evidenceId: { type: 'string', description: 'Evidence ID to rate' },
-        rating: { type: 'number', minimum: 1, maximum: 5, description: 'Rating from 1 to 5' },
+        rating: { type: 'integer', enum: [-1, 0, 1], description: 'Rating: 1 (up), 0 (irrelevant), or -1 (down)' },
+        sideId: { type: 'string', description: 'Optional side UUID this rating relates to' },
       },
       required: ['evidenceId', 'rating'],
     },
@@ -616,7 +617,7 @@ ${JSON.stringify(trial, null, 2)}`,
 
       case 'tribeunal_revoke_vote': {
         const p = RevokeVoteSchema.parse(params);
-        const result = await apiClient.revokeVote(p.trialId, p.voteId);
+        const result = await apiClient.revokeVote(p.trialId, p.sideId);
         return {
           content: [
             {
@@ -649,7 +650,7 @@ ${JSON.stringify(trial, null, 2)}`,
 
       case 'tribeunal_rate_evidence': {
         const p = RateEvidenceSchema.parse(params);
-        const result = await apiClient.rateEvidence(p.evidenceId, p.rating);
+        const result = await apiClient.rateEvidence(p.evidenceId, p.rating, p.sideId);
         return {
           content: [
             { type: 'text', text: `Evidence rated successfully!\n${JSON.stringify(result, null, 2)}` },
