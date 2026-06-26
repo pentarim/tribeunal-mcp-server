@@ -43,25 +43,35 @@ This is a **Model Context Protocol (MCP) Server** that provides programmatic acc
 
 ### Cloudflare Worker (`worker/`)
 
-An alternative deployment of the Tribeunal MCP tools as a Cloudflare Worker using `workers-mcp`.
+A remote, **Auth0-authenticated** deployment of the Tribeunal MCP tools as a Cloudflare
+Worker. Each caller logs in via Auth0 Universal Login and every tool call runs **as that
+user** against the Tribeunal API. It exposes the same tools as the stdio server through a
+shared, transport-agnostic core (`src/core/tools.ts`, `src/client/api-client.ts`).
 
-**Entry Point**: `worker/src/index.ts` - `WorkerEntrypoint` class with JSDoc-annotated methods
-**Config**: `worker/wrangler.jsonc` - Cloudflare Worker configuration
-**Docs Generation**: `workers-mcp docgen` parses JSDoc comments into MCP tool metadata
+**Entry Point**: `worker/src/index.ts` - `OAuthProvider` wiring (`/sse` + `/mcp` handlers,
+Auth0 `defaultHandler`); re-exports the `TribeunalMCP` Durable Object.
+**Config**: `worker/wrangler.jsonc` - DO binding `MCP_OBJECT`, `OAUTH_KV` namespace,
+non-secret `vars`, `nodejs_compat`.
+**Authoritative docs**: `worker/README.md` (architecture, Auth0 contract, secrets).
 
-Key differences from the stdio server:
-- Uses `fetch()` instead of `axios` (Workers runtime)
-- Auth via Cloudflare secrets (`TRIBEUNAL_API_KEY`, `TRIBEUNAL_API_BASE_URL`, `SHARED_SECRET`)
-- Methods return `string` (JSON-serialized) — required by `workers-mcp`
-- Tool definitions derived from JSDoc annotations, not Zod schemas
-- Deployed to Cloudflare's edge network
+Built on `@cloudflare/workers-oauth-provider` + the `agents` SDK (`McpAgent`) + Hono, using
+`axios` for API calls (with `nodejs_compat`). Auth secrets are set via `wrangler secret put`
+(`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_AUDIENCE`,
+`COOKIE_ENCRYPTION_KEY`); `TRIBEUNAL_API_BASE_URL` and `AUTH0_SCOPE` are non-secret `vars`
+in `wrangler.jsonc`.
+
+> The older `workers-mcp` / JSDoc-docgen worker is gone — **do not run `workers-mcp docgen`**.
 
 #### Worker Commands
-- `cd worker && npm run dev` - Local development with Wrangler
-- `cd worker && npm run deploy` - Generate docs and deploy to Cloudflare
-- `cd worker && npx workers-mcp secret generate` - Generate shared secret
-- `cd worker && npx workers-mcp secret upload` - Upload shared secret to Cloudflare
-- `cd worker && npx wrangler secret put <NAME>` - Set environment secrets
+- `cd worker && npm run dev` - Local development (`wrangler dev`)
+- `cd worker && npm run deploy` - Deploy to Cloudflare (`wrangler deploy`)
+- `cd worker && npx wrangler secret put <NAME>` - Set a production secret
+- `cd worker && npx wrangler types` - Regenerate Cloudflare runtime types after a `wrangler.jsonc` change
+
+**Deploying to production:** follow the **`/deploy-worker` skill**
+(`.claude/skills/deploy-worker/SKILL.md`) — it is the single source of truth for the deploy
+procedure, required KV/secrets/Auth0 config, verification, and gotchas. Keep that skill and
+`worker/README.md` in sync; do not duplicate deploy steps here.
 
 ### Error Handling
 - Custom `TribeunalAPIError` class for API errors (stdio server)
@@ -92,7 +102,7 @@ Key differences from the stdio server:
 
 ### Key Dependencies
 - `@modelcontextprotocol/sdk` - MCP protocol implementation (stdio server)
-- `workers-mcp` - Cloudflare Worker MCP integration (worker)
+- `@cloudflare/workers-oauth-provider` + `agents` (`McpAgent`) + `hono` - Auth0 remote MCP worker
 - `axios` - HTTP client (stdio server)
 - `zod` - Schema validation (stdio server)
 - `dotenv` - Environment management (stdio server)
