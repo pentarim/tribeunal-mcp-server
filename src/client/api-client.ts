@@ -11,6 +11,36 @@ export class TribeunalAPIError extends Error {
   }
 }
 
+/**
+ * Pull a human-readable message out of a Tribeunal API error body.
+ *
+ * The API renders errors via API Platform, so the useful text lives in
+ * `detail` (problem+json / APIP 4) or `hydra:description` (Hydra / APIP 3),
+ * with field-level issues in `violations` — NOT in a top-level `message`.
+ * Reading only `message` (the previous behaviour) collapsed every failure to a
+ * bare "Request failed with status code 400", which is what made callers guess
+ * blindly. Falls back through the older shapes and finally `fallback`.
+ */
+export function extractApiErrorMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, any>;
+    if (typeof d.detail === 'string' && d.detail.trim()) return d.detail;
+    if (typeof d['hydra:description'] === 'string' && d['hydra:description'].trim()) return d['hydra:description'];
+    if (Array.isArray(d.violations) && d.violations.length) {
+      const msg = d.violations
+        .map((v: any) => (v?.propertyPath ? `${v.propertyPath}: ${v.message}` : v?.message))
+        .filter(Boolean)
+        .join('; ');
+      if (msg) return msg;
+    }
+    if (typeof d.error === 'string' && d.error.trim()) return d.error;
+    if (d.error && typeof d.error.message === 'string' && d.error.message.trim()) return d.error.message;
+    if (typeof d.message === 'string' && d.message.trim()) return d.message;
+    if (typeof d.title === 'string' && d.title.trim()) return d.title;
+  }
+  return fallback;
+}
+
 export interface TribeunalAPIClientConfig {
   /** Base URL of the Tribeunal API, e.g. https://tribeunal.com/api */
   baseURL: string;
@@ -70,16 +100,15 @@ export class TribeunalAPIClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
-        const errorData = error.response?.data as any;
-        const message = errorData?.message || error.message;
+        const message = extractApiErrorMessage(error.response?.data, error.message);
         const statusCode = error.response?.status;
         throw new TribeunalAPIError(message, statusCode, error.response?.data);
       }
     );
   }
 
-  // Trial endpoints
-  async searchTrials(params: {
+  // Case endpoints
+  async searchCases(params: {
     query?: string;
     status?: string;
     type?: string;
@@ -91,45 +120,48 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
-  async getTrial(id: string) {
+  async getCase(id: string) {
     const response = await this.client.get(`/cases/${id}`);
     return response.data;
   }
 
-  async createTrial(data: {
+  async createCase(data: {
     title: string;
     description: string;
     type: 'case' | 'advice' | 'poll';
     juryType: 'public' | 'invited';
     sides: Array<{ name: string; description?: string }>;
-    trialLength?: number;
-    decisionRequirement?: string;
+    caseLength?: number;
     tags?: string[];
   }) {
-    const response = await this.client.post('/cases', data);
+    const { caseLength, ...rest } = data;
+    // The backend's create contract still names the duration `trialLength`; this
+    // is the single internal mapping from the user-facing `caseLength`.
+    const body = caseLength === undefined ? rest : { ...rest, trialLength: caseLength };
+    const response = await this.client.post('/cases', body);
     return response.data;
   }
 
   // Vote endpoints (these routes have no /api/ prefix)
-  async castVote(trialId: string, sideId: string) {
+  async castVote(caseId: string, sideId: string) {
     const params = new URLSearchParams();
     params.append('side_id', sideId);
-    const response = await this.client.post(`${this.baseOrigin}/cases/${trialId}/vote`, params, {
+    const response = await this.client.post(`${this.baseOrigin}/cases/${caseId}/vote`, params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response.data;
   }
 
-  async revokeVote(trialId: string, sideId: string) {
+  async revokeVote(caseId: string, sideId: string) {
     // The trailing segment is the SIDE uuid (the API looks up the caller's vote
-    // by (user, trial)); this vote route has no /api/ prefix.
-    const response = await this.client.delete(`${this.baseOrigin}/cases/${trialId}/vote/${sideId}`);
+    // by (user, case)); this vote route has no /api/ prefix.
+    const response = await this.client.delete(`${this.baseOrigin}/cases/${caseId}/vote/${sideId}`);
     return response.data;
   }
 
-  async getVoteStats(trialId: string) {
+  async getVoteStats(caseId: string) {
     // Served by GET /api/cases/{uuid}/votes (uses the /api baseURL, not baseOrigin).
-    const response = await this.client.get(`/cases/${trialId}/votes`);
+    const response = await this.client.get(`/cases/${caseId}/votes`);
     return response.data;
   }
 
@@ -220,17 +252,17 @@ export class TribeunalAPIClient {
   }
 
   // Evidence endpoints
-  async getTrialEvidence(trialId: string) {
-    const response = await this.client.get(`/cases/${trialId}/evidence`);
+  async getCaseEvidence(caseId: string) {
+    const response = await this.client.get(`/cases/${caseId}/evidence`);
     return response.data;
   }
 
-  async submitEvidence(trialId: string, data: {
+  async submitEvidence(caseId: string, data: {
     content: string;
     type: 'text' | 'link' | 'image';
     sideId?: string;
   }) {
-    const response = await this.client.post(`/cases/${trialId}/evidence`, data);
+    const response = await this.client.post(`/cases/${caseId}/evidence`, data);
     return response.data;
   }
 
