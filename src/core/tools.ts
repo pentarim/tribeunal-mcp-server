@@ -155,7 +155,8 @@ export const TOOL_DEFINITIONS = [
       type: 'object',
       properties: {
         caseId: { type: 'string', description: 'Case ID to submit evidence for' },
-        content: { type: 'string', description: 'Evidence content' },
+        title: { type: 'string', maxLength: 200, description: 'Short title for the evidence (derived from the content if omitted)' },
+        content: { type: 'string', description: 'Evidence content / body' },
         type: { type: 'string', enum: ['text', 'link', 'image'], default: 'text', description: 'Type of evidence' },
         sideId: { type: 'string', description: 'Optional side ID to support with this evidence' },
       },
@@ -427,6 +428,7 @@ ${JSON.stringify(createdCase, null, 2)}`,
       case 'tribeunal_submit_evidence': {
         const p = SubmitEvidenceSchema.parse(params);
         const evidence = await apiClient.submitEvidence(p.caseId, {
+          title: p.title,
           content: p.content,
           type: p.type,
           sideId: p.sideId,

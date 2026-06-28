@@ -18,7 +18,8 @@ export const GetVoteStatsSchema = z.object({
 
 export const SubmitEvidenceSchema = z.object({
   caseId: z.string().describe('Case ID to submit evidence for'),
-  content: z.string().describe('Evidence content'),
+  title: z.string().max(200).optional().describe('Short title for the evidence (derived from the content if omitted)'),
+  content: z.string().describe('Evidence content / body'),
   type: z.enum(['text', 'link', 'image']).default('text').describe('Type of evidence'),
   sideId: z.string().optional().describe('Optional side ID to support with this evidence'),
 });

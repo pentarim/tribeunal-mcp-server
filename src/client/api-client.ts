@@ -41,6 +41,17 @@ export function extractApiErrorMessage(data: unknown, fallback: string): string 
   return fallback;
 }
 
+/**
+ * Derive a short evidence title from its content. The API requires a non-empty
+ * title (<= 200 chars); callers that pass only free-form content get the first
+ * line (or a truncated prefix) so submission no longer fails with invalid_title.
+ */
+export function deriveEvidenceTitle(content: string): string {
+  const firstLine = (content ?? '').split('\n')[0].trim();
+  const base = firstLine || (content ?? '').trim() || 'Evidence';
+  return base.length > 200 ? `${base.slice(0, 197)}...` : base;
+}
+
 export interface TribeunalAPIClientConfig {
   /** Base URL of the Tribeunal API, e.g. https://tribeunal.com/api */
   baseURL: string;
@@ -258,11 +269,24 @@ export class TribeunalAPIClient {
   }
 
   async submitEvidence(caseId: string, data: {
+    title?: string;
     content: string;
     type: 'text' | 'link' | 'image';
     sideId?: string;
   }) {
-    const response = await this.client.post(`/cases/${caseId}/evidence`, data);
+    // The API stores evidence as title + description (+ optional url for links);
+    // it does not read a `content` field. Map the tool's content to description
+    // and derive a title from it when the caller didn't supply one.
+    const title = (data.title?.trim() || deriveEvidenceTitle(data.content));
+    const body: Record<string, unknown> = {
+      title,
+      description: data.content,
+      type: data.type,
+    };
+    if (data.type === 'link') {
+      body.url = data.content;
+    }
+    const response = await this.client.post(`/cases/${caseId}/evidence`, body);
     return response.data;
   }
 
