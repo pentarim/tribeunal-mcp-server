@@ -1,24 +1,16 @@
 import { z } from 'zod';
 import { TribeunalAPIClient, TribeunalAPIError } from '../client/api-client.js';
 
-// Import schemas from tools
+// Case schemas
 import {
-  FindActiveDecisionsSchema,
-  GetDecisionStatusSchema,
-  StartDecisionProcessSchema,
-  GatherEvidenceSchema,
-  // Backward compatibility aliases
-  SearchTrialsSchema,
-  GetTrialSchema,
-  CreateTrialSchema,
+  SearchCasesSchema,
+  GetCaseSchema,
+  CreateCaseSchema,
   ListEvidenceSchema,
-} from '../tools/trials.js';
+} from '../tools/cases.js';
 
+// Voting & evidence schemas
 import {
-  ChooseOptionSchema,
-  CheckConsensusSchema,
-  ProvideSupportingInfoSchema,
-  // Backward compatibility aliases
   CastVoteSchema,
   RevokeVoteSchema,
   GetVoteStatsSchema,
@@ -47,130 +39,51 @@ import {
 /**
  * The canonical list of tool definitions advertised via `tools/list`.
  *
- * Extracted verbatim from the historical `setupTools()` in `src/server.ts` so
- * the stdio server and the Cloudflare worker advertise the SAME 32 tools.
+ * A single "case" vocabulary: every tool maps directly to a Tribeunal API
+ * operation. The stdio server and the Cloudflare worker advertise the SAME
+ * set so behaviour is identical regardless of how the caller authenticated.
  */
 export const TOOL_DEFINITIONS = [
-  // Decision-focused tools (primary interface) - PRIORITIZED FOR "DECIDE" PROMPTS
+  // Case tools
   {
-    name: 'decision_start_process',
-    description: 'Make decisions through structured community processes - perfect for any "decide" scenario. When you need to decide between options, choose alternatives, or make choices, this tool helps you decide by gathering community input and votes.',
+    name: 'tribeunal_create_case',
+    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first.',
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', minLength: 3, maxLength: 200, description: 'Clear decision question or statement (e.g., "Should we decide on lunch at Italian or Mexican?")' },
-        description: { type: 'string', minLength: 10, description: 'Context, background, and criteria for making this decision' },
-        decisionType: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Decision binding level - case (binding community decision), advice (input for final decider), poll (opinion gathering)' },
-        participationType: { type: 'string', enum: ['public', 'invited'], default: 'public', description: 'Who can participate - open to everyone or specific invitees only' },
-        options: {
+        title: { type: 'string', minLength: 3, maxLength: 200, description: 'Case title — the question or statement to be decided' },
+        description: { type: 'string', minLength: 10, description: 'Context, background, and criteria for the case' },
+        type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Case type — case (binding jury decision), advice (input for the creator), or poll (opinion gathering)' },
+        juryType: { type: 'string', enum: ['public', 'invited'], default: 'public', description: 'Who can participate — public (anyone) or invited only' },
+        sides: {
           type: 'array',
           items: {
             type: 'object',
             properties: {
-              name: { type: 'string', description: 'Option or choice name for the decision' },
-              description: { type: 'string', description: 'Details about this option and its implications' },
+              name: { type: 'string', description: 'Option/choice name' },
+              description: { type: 'string', description: 'Optional description for this choice' },
             },
             required: ['name'],
           },
           minItems: 2,
           maxItems: 10,
-          description: 'Available options/choices for decision makers to select from',
+          description: 'The choices/options voters pick between (2-10)',
         },
-        timeframe: { type: 'number', minimum: 60, maximum: 2592000, default: 86400, description: 'Decision deadline in seconds (default: 1 day)' },
-        consensusRequired: { type: 'string', enum: ['any_majority', 'simple_majority', 'qualified_majority', 'unanimous'], default: 'simple_majority', description: 'Consensus threshold needed to finalize the decision' },
-        categories: { type: 'array', items: { type: 'string' }, description: 'Decision categories for organization and findability' },
-        stakeholders: { type: 'array', items: { type: 'string' }, description: 'Specific people to invite for stakeholder input (emails or usernames)' },
-        template: { type: 'string', enum: ['business_choice', 'technical_decision', 'policy_vote', 'priority_ranking', 'emergency_decision', 'custom'], default: 'custom', description: 'Pre-configured decision template' },
+        caseLength: { type: 'number', minimum: 60, maximum: 2592000, default: 86400, description: 'Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)' },
+        tags: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Up to 4 tags for categorization' },
       },
-      required: ['title', 'description', 'decisionType', 'options'],
+      required: ['title', 'description', 'type', 'sides'],
     },
   },
   {
-    name: 'decision_find_active',
-    description: 'Decide by finding active community decisions requiring input and participation. Search for existing decisions to help you decide, or find similar decisions that have been made before.',
+    name: 'tribeunal_search_cases',
+    description: 'Find existing cases on Tribeunal by query, status, type, or tags. Use only when the user wants to look up or reference an existing case — to start a new one, use tribeunal_create_case.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Search for decisions by topic, title, or description' },
-        status: { type: 'string', enum: ['init', 'open', 'closed', 'expired', 'suspended'], description: 'Decision status - open for active decisions requiring input' },
-        decisionType: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Decision type - case (binding jury decision), advice (input for final decider), poll (opinion gathering)' },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Filter by decision categories or topics' },
-        page: { type: 'number', minimum: 1, default: 1, description: 'Page number for pagination' },
-        limit: { type: 'number', minimum: 1, maximum: 100, default: 20, description: 'Number of decisions to return per page' },
-      },
-    },
-  },
-  {
-    name: 'decision_choose_option',
-    description: 'Express your choice in an active decision with optional reasoning - helps you decide by casting your vote or preference',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        decisionId: { type: 'string', description: 'Decision ID to express your choice in' },
-        optionId: { type: 'string', description: 'Option/choice ID you are selecting as your preference' },
-        reasoning: { type: 'string', description: 'Optional explanation for why you chose this option' },
-      },
-      required: ['decisionId', 'optionId'],
-    },
-  },
-  {
-    name: 'decision_get_status',
-    description: 'Check status, progress, and current results of a specific decision to help you decide if more input is needed',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: 'Decision ID or UUID to check status, progress, and current results' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'decision_check_consensus',
-    description: 'Check current consensus, participation levels, and progress toward resolution to help finalize decisions',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        decisionId: { type: 'string', description: 'Decision ID to check current consensus, participation levels, and progress toward resolution' },
-      },
-      required: ['decisionId'],
-    },
-  },
-  {
-    name: 'decision_gather_evidence',
-    description: 'Gather all supporting evidence, arguments, and data for a decision to help you decide based on facts',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        decisionId: { type: 'string', description: 'Decision ID to gather all supporting evidence, arguments, and data for' },
-      },
-      required: ['decisionId'],
-    },
-  },
-  {
-    name: 'decision_provide_info',
-    description: 'Provide supporting information, evidence, or arguments for a decision to help others decide',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        decisionId: { type: 'string', description: 'Decision ID to provide supporting information for' },
-        content: { type: 'string', description: 'Supporting information, data, arguments, or evidence content' },
-        infoType: { type: 'string', enum: ['text', 'link', 'image'], default: 'text', description: 'Type of supporting information' },
-        supportsOption: { type: 'string', description: 'Optional: which specific option this information supports' },
-      },
-      required: ['decisionId', 'content'],
-    },
-  },
-
-  // Legacy tools (backward compatibility)
-  {
-    name: 'tribeunal_search_trials',
-    description: 'Search for trials on Tribeunal with various filters',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query for trial title or description' },
-        status: { type: 'string', enum: ['init', 'open', 'closed', 'expired', 'suspended'], description: 'Trial status filter' },
-        type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Trial type filter' },
+        query: { type: 'string', description: 'Search query for case title or description' },
+        status: { type: 'string', enum: ['init', 'open', 'closed', 'expired', 'suspended'], description: 'Case status filter (open = accepting votes)' },
+        type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Case type filter' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Filter by tags' },
         page: { type: 'number', minimum: 1, default: 1, description: 'Page number for pagination' },
         limit: { type: 'number', minimum: 1, maximum: 100, default: 20, description: 'Number of results per page' },
@@ -178,70 +91,38 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
-    name: 'tribeunal_get_trial',
-    description: 'Get detailed information about a specific trial',
+    name: 'tribeunal_get_case',
+    description: 'Get detailed information about a specific case',
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Trial ID or UUID' },
+        id: { type: 'string', description: 'Case ID or UUID' },
       },
       required: ['id'],
     },
   },
   {
-    name: 'tribeunal_create_trial',
-    description: 'Create a new trial on Tribeunal for community decision-making',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', minLength: 3, maxLength: 200, description: 'Trial title' },
-        description: { type: 'string', minLength: 10, description: 'Detailed description of the trial' },
-        type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Type of trial' },
-        juryType: { type: 'string', enum: ['public', 'invited'], default: 'public', description: 'Who can participate' },
-        sides: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Option/choice name' },
-              description: { type: 'string', description: 'Optional description' },
-            },
-            required: ['name'],
-          },
-          minItems: 2,
-          maxItems: 10,
-          description: 'Available choices for voting',
-        },
-        trialLength: { type: 'number', minimum: 60, maximum: 2592000, default: 86400, description: 'Duration in seconds' },
-        decisionRequirement: { type: 'string', enum: ['any_majority', 'simple_majority', 'qualified_majority', 'unanimous'], default: 'simple_majority' },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Tags for categorization' },
-        invitedUsers: { type: 'array', items: { type: 'string' }, description: 'Users to invite (for invited jury type)' },
-      },
-      required: ['title', 'description', 'type', 'sides'],
-    },
-  },
-  {
     name: 'tribeunal_list_evidence',
-    description: 'Get all evidence submitted for a specific trial',
+    description: 'Get all evidence submitted for a specific case',
     inputSchema: {
       type: 'object',
       properties: {
-        trialId: { type: 'string', description: 'Trial ID to get evidence for' },
+        caseId: { type: 'string', description: 'Case ID to get evidence for' },
       },
-      required: ['trialId'],
+      required: ['caseId'],
     },
   },
   // Voting tools
   {
     name: 'tribeunal_cast_vote',
-    description: 'Cast a vote on a trial for a specific side/option',
+    description: 'Cast a vote on a case for a specific side/option',
     inputSchema: {
       type: 'object',
       properties: {
-        trialId: { type: 'string', description: 'Trial ID to vote on' },
+        caseId: { type: 'string', description: 'Case ID to vote on' },
         sideId: { type: 'string', description: 'Side/option ID to vote for' },
       },
-      required: ['trialId', 'sideId'],
+      required: ['caseId', 'sideId'],
     },
   },
   {
@@ -250,35 +131,35 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        trialId: { type: 'string', description: 'Trial ID' },
-        sideId: { type: 'string', description: 'Side UUID whose vote to revoke (the API resolves the caller\'s vote by user+trial)' },
+        caseId: { type: 'string', description: 'Case ID' },
+        sideId: { type: 'string', description: "Side UUID whose vote to revoke (the API resolves the caller's vote by user+case)" },
       },
-      required: ['trialId', 'sideId'],
+      required: ['caseId', 'sideId'],
     },
   },
   {
     name: 'tribeunal_get_vote_stats',
-    description: 'Get real-time voting statistics for a trial',
+    description: 'Get real-time voting statistics for a case',
     inputSchema: {
       type: 'object',
       properties: {
-        trialId: { type: 'string', description: 'Trial ID to get voting statistics for' },
+        caseId: { type: 'string', description: 'Case ID to get voting statistics for' },
       },
-      required: ['trialId'],
+      required: ['caseId'],
     },
   },
   {
     name: 'tribeunal_submit_evidence',
-    description: 'Submit evidence to support or oppose a side in a trial',
+    description: 'Submit evidence to support or oppose a side in a case',
     inputSchema: {
       type: 'object',
       properties: {
-        trialId: { type: 'string', description: 'Trial ID to submit evidence for' },
+        caseId: { type: 'string', description: 'Case ID to submit evidence for' },
         content: { type: 'string', description: 'Evidence content' },
         type: { type: 'string', enum: ['text', 'link', 'image'], default: 'text', description: 'Type of evidence' },
         sideId: { type: 'string', description: 'Optional side ID to support with this evidence' },
       },
-      required: ['trialId', 'content'],
+      required: ['caseId', 'content'],
     },
   },
   {
@@ -394,7 +275,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_dashboard',
-    description: 'Get jury duty dashboard with current trial assignments (cases to vote on), allowance info, and active request status. Best tool for finding trials assigned to you.',
+    description: 'Get jury duty dashboard with current case assignments (cases to vote on), allowance info, and active request status. Best tool for finding cases assigned to you.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -402,7 +283,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_start',
-    description: 'Start a jury duty search — join the matchmaking queue to be assigned to a trial needing jurors. Consumes 1 daily allowance.',
+    description: 'Start a jury duty search — join the matchmaking queue to be assigned to a case needing jurors. Consumes 1 daily allowance.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -418,7 +299,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_accept',
-    description: 'Accept a jury duty assignment to serve on a specific trial',
+    description: 'Accept a jury duty assignment to serve on a specific case',
     inputSchema: {
       type: 'object',
       properties: {
@@ -429,7 +310,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_reject',
-    description: 'Reject a jury duty assignment and return to the queue for a different trial',
+    description: 'Reject a jury duty assignment and return to the queue for a different case',
     inputSchema: {
       type: 'object',
       properties: {
@@ -460,7 +341,7 @@ export interface ToolCallResult {
  * Dispatch a single tool call against an injected API client.
  *
  * This is the transport-agnostic heart of the server: the stdio `Server` and
- * the Cloudflare `McpAgent` both funnel calls here so the 32 tools behave
+ * the Cloudflare `McpAgent` both funnel calls here so the tools behave
  * identically regardless of how the caller authenticated.
  */
 export async function dispatchToolCall(
@@ -472,142 +353,51 @@ export async function dispatchToolCall(
 
   try {
     switch (toolName) {
-      // Decision-focused tools (new)
-      case 'decision_find_active': {
-        const p = FindActiveDecisionsSchema.parse(params);
-        const results = await apiClient.searchTrials({
-          query: p.query,
-          status: p.status,
-          type: p.decisionType,
-          tags: p.tags,
-          page: p.page,
-          limit: p.limit,
-        });
+      // Case tools
+      case 'tribeunal_create_case': {
+        const p = CreateCaseSchema.parse(params);
+        const createdCase = await apiClient.createCase(p);
+        const url = createdCase.url || `https://tribeunal.test/cases/${createdCase.slug}`;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Case created successfully!
+
+UUID: ${createdCase.uuid}
+URL: ${url}
+
+You can view and share the case at: ${url}
+
+Full response:
+${JSON.stringify(createdCase, null, 2)}`,
+            },
+          ],
+        };
+      }
+
+      case 'tribeunal_search_cases': {
+        const p = SearchCasesSchema.parse(params);
+        const results = await apiClient.searchCases(p);
         return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
       }
 
-      case 'decision_get_status': {
-        const p = GetDecisionStatusSchema.parse(params);
-        const trial = await apiClient.getTrial(p.id);
-        return { content: [{ type: 'text', text: JSON.stringify(trial, null, 2) }] };
-      }
-
-      case 'decision_start_process': {
-        const p = StartDecisionProcessSchema.parse(params);
-        const trial = await apiClient.createTrial({
-          title: p.title,
-          description: p.description,
-          type: p.decisionType,
-          juryType: p.participationType,
-          sides: p.options,
-          trialLength: p.timeframe,
-          decisionRequirement: p.consensusRequired,
-          tags: p.categories,
-        });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Decision process started successfully!
-
-UUID: ${trial.uuid}
-URL: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
-
-You can view and participate in the decision at: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
-
-Full response:
-${JSON.stringify(trial, null, 2)}`,
-            },
-          ],
-        };
-      }
-
-      case 'decision_choose_option': {
-        const p = ChooseOptionSchema.parse(params);
-        const result = await apiClient.castVote(p.decisionId, p.optionId);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Choice recorded successfully!${p.reasoning ? ` Reasoning: ${p.reasoning}` : ''}\n${JSON.stringify(result, null, 2)}`,
-            },
-          ],
-        };
-      }
-
-      case 'decision_check_consensus': {
-        const p = CheckConsensusSchema.parse(params);
-        const stats = await apiClient.getVoteStats(p.decisionId);
-        return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
-      }
-
-      case 'decision_gather_evidence': {
-        const p = GatherEvidenceSchema.parse(params);
-        const evidence = await apiClient.getTrialEvidence(p.decisionId);
-        return { content: [{ type: 'text', text: JSON.stringify(evidence, null, 2) }] };
-      }
-
-      case 'decision_provide_info': {
-        const p = ProvideSupportingInfoSchema.parse(params);
-        const evidence = await apiClient.submitEvidence(p.decisionId, {
-          content: p.content,
-          type: p.infoType,
-          sideId: p.supportsOption,
-        });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Supporting information submitted successfully!\n${JSON.stringify(evidence, null, 2)}`,
-            },
-          ],
-        };
-      }
-
-      // Legacy trial tools (backward compatibility)
-      case 'tribeunal_search_trials': {
-        const p = SearchTrialsSchema.parse(params);
-        const results = await apiClient.searchTrials(p);
-        return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
-      }
-
-      case 'tribeunal_get_trial': {
-        const p = GetTrialSchema.parse(params);
-        const trial = await apiClient.getTrial(p.id);
-        return { content: [{ type: 'text', text: JSON.stringify(trial, null, 2) }] };
-      }
-
-      case 'tribeunal_create_trial': {
-        const p = CreateTrialSchema.parse(params);
-        const trial = await apiClient.createTrial(p);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Trial created successfully!
-
-UUID: ${trial.uuid}
-URL: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
-
-You can view and share the trial at: ${trial.url || `https://tribeunal.test/cases/${trial.slug}`}
-
-Full response:
-${JSON.stringify(trial, null, 2)}`,
-            },
-          ],
-        };
+      case 'tribeunal_get_case': {
+        const p = GetCaseSchema.parse(params);
+        const found = await apiClient.getCase(p.id);
+        return { content: [{ type: 'text', text: JSON.stringify(found, null, 2) }] };
       }
 
       case 'tribeunal_list_evidence': {
         const p = ListEvidenceSchema.parse(params);
-        const evidence = await apiClient.getTrialEvidence(p.trialId);
+        const evidence = await apiClient.getCaseEvidence(p.caseId);
         return { content: [{ type: 'text', text: JSON.stringify(evidence, null, 2) }] };
       }
 
       // Vote tools
       case 'tribeunal_cast_vote': {
         const p = CastVoteSchema.parse(params);
-        const result = await apiClient.castVote(p.trialId, p.sideId);
+        const result = await apiClient.castVote(p.caseId, p.sideId);
         return {
           content: [
             { type: 'text', text: `Vote cast successfully!\n${JSON.stringify(result, null, 2)}` },
@@ -617,7 +407,7 @@ ${JSON.stringify(trial, null, 2)}`,
 
       case 'tribeunal_revoke_vote': {
         const p = RevokeVoteSchema.parse(params);
-        const result = await apiClient.revokeVote(p.trialId, p.sideId);
+        const result = await apiClient.revokeVote(p.caseId, p.sideId);
         return {
           content: [
             {
@@ -630,13 +420,13 @@ ${JSON.stringify(trial, null, 2)}`,
 
       case 'tribeunal_get_vote_stats': {
         const p = GetVoteStatsSchema.parse(params);
-        const stats = await apiClient.getVoteStats(p.trialId);
+        const stats = await apiClient.getVoteStats(p.caseId);
         return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
       }
 
       case 'tribeunal_submit_evidence': {
         const p = SubmitEvidenceSchema.parse(params);
-        const evidence = await apiClient.submitEvidence(p.trialId, {
+        const evidence = await apiClient.submitEvidence(p.caseId, {
           content: p.content,
           type: p.type,
           sideId: p.sideId,
@@ -783,7 +573,7 @@ ${JSON.stringify(trial, null, 2)}`,
           content: [
             {
               type: 'text',
-              text: `Jury duty accepted! Trial: ${result.trial?.title || 'Unknown'}\nURL: ${result.trial?.url || 'N/A'}\n\n${JSON.stringify(result, null, 2)}`,
+              text: `Jury duty accepted! You are now serving on this case.\n\n${JSON.stringify(result, null, 2)}`,
             },
           ],
         };
