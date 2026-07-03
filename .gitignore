@@ -42,3 +42,6 @@ temp/
 # Worker
 worker/.dev.vars
 worker/.wrangler/
+
+# Local editor / agent config
+.claude/
