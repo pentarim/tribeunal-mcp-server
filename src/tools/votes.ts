@@ -5,6 +5,7 @@ import { z } from 'zod';
 export const CastVoteSchema = z.object({
   caseId: z.string().describe('Case ID to vote on'),
   sideId: z.string().describe('Side/option ID to vote for'),
+  comment: z.string().max(2000).optional().describe('Optional short rationale, stored as a vote-linked comment (shown in the case activity feed; markable as evidence by the owner/jury)'),
 });
 
 export const RevokeVoteSchema = z.object({
@@ -16,16 +17,8 @@ export const GetVoteStatsSchema = z.object({
   caseId: z.string().describe('Case ID to get voting statistics for'),
 });
 
-export const SubmitEvidenceSchema = z.object({
-  caseId: z.string().describe('Case ID to submit evidence for'),
-  title: z.string().max(200).optional().describe('Short title for the evidence (derived from the content if omitted)'),
-  content: z.string().describe('Evidence content / body'),
-  type: z.enum(['text', 'link', 'image']).default('text').describe('Type of evidence'),
-  sideId: z.string().optional().describe('Optional side ID to support with this evidence'),
-});
-
 export const RateEvidenceSchema = z.object({
-  evidenceId: z.string().describe('Evidence ID to rate'),
+  evidenceId: z.string().describe('Case-file evidence ID to rate (file evidence only; comments are not ratable)'),
   rating: z.number().int().min(-1).max(1).describe('Rating: 1 (up), 0 (irrelevant), or -1 (down)'),
   sideId: z.string().optional().describe('Optional side UUID this rating relates to'),
 });

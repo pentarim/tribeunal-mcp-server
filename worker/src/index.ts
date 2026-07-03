@@ -8,7 +8,7 @@ import type { Env } from './types';
 // (the wrangler `durable_objects` binding `MCP_OBJECT` points at this class).
 export { TribeunalMCP };
 
-// The nine Tribeunal resource scopes plus the OIDC standard scopes.
+// The ten Tribeunal resource scopes plus the OIDC standard scopes.
 // MUST stay in sync with docs/AUTH0_CONTRACT.md §4.1 / the worker's AUTH0_SCOPE.
 const SCOPES_SUPPORTED = [
   'openid',
@@ -19,7 +19,8 @@ const SCOPES_SUPPORTED = [
   'create:trials',
   'vote:cast',
   'vote:revoke',
-  'submit:evidence',
+  'post:comments',
+  'mark:evidence',
   'rate:evidence',
   'manage:tribes',
   'jury:duty',

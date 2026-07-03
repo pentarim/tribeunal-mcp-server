@@ -48,7 +48,7 @@
   // For local `wrangler dev` these are overridden by worker/.dev.vars.
   "vars": {
     "TRIBEUNAL_API_BASE_URL": "https://tribeunal.com/api",
-    "AUTH0_SCOPE": "openid profile email offline_access read:trials create:trials vote:cast vote:revoke submit:evidence rate:evidence manage:tribes jury:duty read:profile"
+    "AUTH0_SCOPE": "openid profile email offline_access read:trials create:trials vote:cast vote:revoke post:comments mark:evidence rate:evidence manage:tribes jury:duty read:profile"
   },
 
   "observability": {

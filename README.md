@@ -103,29 +103,38 @@ Add to your `.mcp.json` or Claude Desktop config:
 
 ## Available Tools
 
-### Core Decision Tools
+### Case Tools
 
-- `decision_find_active` - Find active decisions requiring input
-- `decision_get_status` - Check decision status and progress
-- `decision_start_process` - Start a structured decision-making process
-- `decision_choose_option` - Express your choice with optional reasoning
-- `decision_check_consensus` - Monitor consensus and participation levels
-- `decision_gather_evidence` - Collect supporting information and arguments
-- `decision_provide_info` - Submit evidence or supporting data
+- `tribeunal_create_case` - Create a case for community decision-making
+- `tribeunal_search_cases` - Find cases by query, status, type, or tags
+- `tribeunal_get_case` - Get detailed case information (sides, comments, activity)
+- `tribeunal_list_evidence` - List a case's marked evidence (comments + case files)
 
-### Decision Templates
+### Voting Tools
 
-- **Business Choice**: ROI, timeline, resource decisions
-- **Technical Decision**: Architecture, tool selection, implementation choices
-- **Policy Vote**: Rule changes, guideline establishment
-- **Priority Ranking**: Feature prioritization, task ordering
-- **Emergency Decision**: Fast-track decisions with escalation rules
+- `tribeunal_cast_vote` - Vote for a side, optionally with a short comment (shown in the activity feed)
+- `tribeunal_revoke_vote` - Revoke a previously cast vote
+- `tribeunal_get_vote_stats` - Real-time voting statistics
+
+### Comment & Evidence Tools
+
+Evidence is marked, not submitted: post comments, then the case owner or jury
+marks a comment or case file as evidence.
+
+- `tribeunal_post_comment` - Post a comment (your analysis/perspective) on a case
+- `tribeunal_list_comments` - List a case's comments
+- `tribeunal_mark_evidence` - Mark another user's comment or a case file as evidence (owner/jury only)
+- `tribeunal_unmark_evidence` - Remove an evidence mark (owner/jury only)
+- `tribeunal_rate_evidence` - Rate case-file evidence (1 up / 0 irrelevant / -1 down)
 
 ### Community Tools
 
-- `tribeunal_list_tribes` - Browse expert communities
-- `tribeunal_get_tribe` - Get community details and expertise areas
-- `tribeunal_join_tribe` - Join specialized decision-making communities
+- `tribeunal_list_tribes` / `tribeunal_get_tribe` / `tribeunal_join_tribe` / `tribeunal_leave_tribe` / `tribeunal_create_tribe`
+
+### User & Jury Duty Tools
+
+- `tribeunal_get_user` / `tribeunal_get_current_user`
+- `tribeunal_jury_duty_status` / `_allowance` / `_dashboard` / `_start` / `_cancel` / `_accept` / `_reject` / `_history`
 
 ## Development
 
@@ -145,19 +154,19 @@ npm run format
 ### Basic Decision Making
 ```
 User: "I need to decide between React and Vue for my new project"
-AI: Uses decision_start_process to create a structured decision, then decision_gather_evidence to collect pros/cons, finally decision_choose_option based on analysis
+AI: Uses tribeunal_create_case with two sides, shares the case URL, later tribeunal_get_vote_stats to read the community's verdict
 ```
 
-### Market Research
+### Contributing Analysis
 ```
-User: "Should we launch this product in Q1 or Q2?"
-AI: Uses tribeunal_list_tribes to find relevant expert communities, decision_start_process for the timing decision, decision_provide_info with market data
+User: "Weigh in on this open case about EV purchase timing"
+AI: Uses tribeunal_get_case to review sides and comments, tribeunal_post_comment with its analysis, then tribeunal_cast_vote with a short comment explaining the reasoning
 ```
 
-### Technical Architecture
+### Curating Evidence (case owner or jury)
 ```
-User: "Help me choose between microservices and monolith architecture"
-AI: Uses decision_start_process with technical template, decision_gather_evidence for architecture patterns, decision_check_consensus for team alignment
+User: "Mark the strongest comment on my case as evidence"
+AI: Uses tribeunal_list_comments to find it, then tribeunal_mark_evidence {kind: "comment", id} — it now appears in the case's evidence list
 ```
 
 ### Community Engagement

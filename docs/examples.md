@@ -153,17 +153,28 @@ if (preferredOption) {
 }
 ```
 
-### Submit Supporting Evidence
+### Post a Comment (analysis)
 
 ```typescript
-const evidence = await client.callTool('tribeunal_submit_evidence', {
-  trialId: 'trial-uuid',
-  content: 'According to recent studies, Option A provides 40% better outcomes...',
-  type: 'text',
-  sideId: 'side-uuid' // Optional: link to specific side
+const comment = await client.callTool('tribeunal_post_comment', {
+  caseId: 'case-uuid',
+  text: 'According to recent studies, Option A provides 40% better outcomes...',
 });
 
-console.log(`Evidence submitted: ${evidence.id}`);
+console.log(`Comment posted: ${comment.uuid}`);
+```
+
+### Mark a Comment or Case File as Evidence (owner/jury only)
+
+```typescript
+// Find the comment worth elevating
+const comments = await client.callTool('tribeunal_list_comments', { caseId: 'case-uuid' });
+
+// Mark it — it now appears in the case's evidence list
+await client.callTool('tribeunal_mark_evidence', { kind: 'comment', id: 'comment-uuid' });
+
+// Case files work the same way
+await client.callTool('tribeunal_mark_evidence', { kind: 'file', id: 'case-file-uuid' });
 ```
 
 ## Tribe Management Examples
@@ -207,15 +218,15 @@ try {
 class DecisionSupportBot {
   constructor(private client: Client) {}
   
-  async analyzeTrialForVoting(trialId: string): Promise<string> {
+  async analyzeTrialForVoting(caseId: string): Promise<string> {
     // Get trial details
-    const trial = await this.client.callTool('tribeunal_get_trial', { id: trialId });
+    const trial = await this.client.callTool('tribeunal_get_case', { id: caseId });
     
     // Get all evidence
-    const evidence = await this.client.callTool('tribeunal_list_evidence', { trialId });
+    const evidence = await this.client.callTool('tribeunal_list_evidence', { caseId });
     
     // Get current voting statistics
-    const stats = await this.client.callTool('tribeunal_get_vote_stats', { trialId });
+    const stats = await this.client.callTool('tribeunal_get_vote_stats', { caseId });
     
     // Analyze evidence quality
     const sideAnalysis = trial.sides.map(side => {
@@ -276,20 +287,20 @@ class MarketResearchAutomation {
     this.scheduleMonitoring(trial.id);
   }
   
-  private async scheduleMonitoring(trialId: string): Promise<void> {
+  private async scheduleMonitoring(caseId: string): Promise<void> {
     const checkInterval = setInterval(async () => {
-      const trial = await this.client.callTool('tribeunal_get_trial', { id: trialId });
+      const trial = await this.client.callTool('tribeunal_get_case', { id: caseId });
       
       if (trial.status === 'closed') {
         clearInterval(checkInterval);
-        await this.generateReport(trialId);
+        await this.generateReport(caseId);
       }
     }, 3600000); // Check every hour
   }
   
-  private async generateReport(trialId: string): Promise<void> {
-    const trial = await this.client.callTool('tribeunal_get_trial', { id: trialId });
-    const stats = await this.client.callTool('tribeunal_get_vote_stats', { trialId });
+  private async generateReport(caseId: string): Promise<void> {
+    const trial = await this.client.callTool('tribeunal_get_case', { id: caseId });
+    const stats = await this.client.callTool('tribeunal_get_vote_stats', { caseId });
     
     const sortedResults = stats.sides.sort((a, b) => b.voteCount - a.voteCount);
     

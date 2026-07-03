@@ -41,17 +41,6 @@ export function extractApiErrorMessage(data: unknown, fallback: string): string 
   return fallback;
 }
 
-/**
- * Derive a short evidence title from its content. The API requires a non-empty
- * title (<= 200 chars); callers that pass only free-form content get the first
- * line (or a truncated prefix) so submission no longer fails with invalid_title.
- */
-export function deriveEvidenceTitle(content: string): string {
-  const firstLine = (content ?? '').split('\n')[0].trim();
-  const base = firstLine || (content ?? '').trim() || 'Evidence';
-  return base.length > 200 ? `${base.slice(0, 197)}...` : base;
-}
-
 export interface TribeunalAPIClientConfig {
   /** Base URL of the Tribeunal API, e.g. https://tribeunal.com/api */
   baseURL: string;
@@ -154,9 +143,14 @@ export class TribeunalAPIClient {
   }
 
   // Vote endpoints (these routes have no /api/ prefix)
-  async castVote(caseId: string, sideId: string) {
+  async castVote(caseId: string, sideId: string, comment?: string) {
     const params = new URLSearchParams();
     params.append('side_id', sideId);
+    // Optional rationale: stored server-side as a vote-linked comment shown
+    // in the case activity feed.
+    if (comment && comment.trim() !== '') {
+      params.append('comment', comment.trim());
+    }
     const response = await this.client.post(`${this.baseOrigin}/cases/${caseId}/vote`, params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
@@ -268,25 +262,27 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
-  async submitEvidence(caseId: string, data: {
-    title?: string;
-    content: string;
-    type: 'text' | 'link' | 'image';
-    sideId?: string;
-  }) {
-    // The API stores evidence as title + description (+ optional url for links);
-    // it does not read a `content` field. Map the tool's content to description
-    // and derive a title from it when the caller didn't supply one.
-    const title = (data.title?.trim() || deriveEvidenceTitle(data.content));
-    const body: Record<string, unknown> = {
-      title,
-      description: data.content,
-      type: data.type,
-    };
-    if (data.type === 'link') {
-      body.url = data.content;
-    }
-    const response = await this.client.post(`/cases/${caseId}/evidence`, body);
+  // Comment & evidence-mark endpoints. Evidence is marked, not submitted:
+  // post a comment, then the case owner/jury can mark it (or a case file).
+  async postComment(caseId: string, text: string) {
+    const response = await this.client.post(`/cases/${caseId}/comments`, { text });
+    return response.data;
+  }
+
+  async listComments(caseId: string) {
+    const response = await this.client.get(`/cases/${caseId}/comments`);
+    return response.data;
+  }
+
+  async markEvidence(kind: 'comment' | 'file', id: string) {
+    const path = kind === 'comment' ? `/comments/${id}/mark` : `/case-files/${id}/mark`;
+    const response = await this.client.post(path);
+    return response.data;
+  }
+
+  async unmarkEvidence(kind: 'comment' | 'file', id: string) {
+    const path = kind === 'comment' ? `/comments/${id}/mark` : `/case-files/${id}/mark`;
+    const response = await this.client.delete(path);
     return response.data;
   }
 

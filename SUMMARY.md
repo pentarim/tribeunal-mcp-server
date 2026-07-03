@@ -36,18 +36,23 @@ mcp-server/
 
 ### Core MCP Tools (14 total)
 
-#### Trial Management (4 tools)
-- **`tribeunal_search_trials`** - Search trials with filters (status, type, tags, dates)
-- **`tribeunal_get_trial`** - Get detailed trial information
-- **`tribeunal_create_trial`** - Create new trials with full configuration
-- **`tribeunal_list_evidence`** - Get trial evidence and ratings
+#### Case Management (4 tools)
+- **`tribeunal_search_cases`** - Search cases with filters (status, type, tags)
+- **`tribeunal_get_case`** - Get detailed case information (sides, comments, activity)
+- **`tribeunal_create_case`** - Create new cases with full configuration
+- **`tribeunal_list_evidence`** - List marked evidence (comments + case files)
 
-#### Voting System (5 tools)
-- **`tribeunal_cast_vote`** - Submit votes on trials
+#### Voting System (3 tools)
+- **`tribeunal_cast_vote`** - Vote on cases, optionally with a comment (shown in the activity feed)
 - **`tribeunal_revoke_vote`** - Remove votes (with penalties)
 - **`tribeunal_get_vote_stats`** - Real-time voting statistics
-- **`tribeunal_submit_evidence`** - Add evidence to trials
-- **`tribeunal_rate_evidence`** - Rate evidence quality (1-5 stars)
+
+#### Comments & Evidence Marking (5 tools)
+- **`tribeunal_post_comment`** - Post analysis/perspective as a case comment
+- **`tribeunal_list_comments`** - List a case's comments
+- **`tribeunal_mark_evidence`** - Mark another user's comment or a case file as evidence (owner/jury)
+- **`tribeunal_unmark_evidence`** - Remove an evidence mark (owner/jury)
+- **`tribeunal_rate_evidence`** - Rate case-file evidence (1 up / 0 irrelevant / -1 down)
 
 #### Tribe Management (5 tools)
 - **`tribeunal_list_tribes`** - Browse available tribes

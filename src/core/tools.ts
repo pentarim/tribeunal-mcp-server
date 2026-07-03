@@ -14,9 +14,15 @@ import {
   CastVoteSchema,
   RevokeVoteSchema,
   GetVoteStatsSchema,
-  SubmitEvidenceSchema,
   RateEvidenceSchema,
 } from '../tools/votes.js';
+
+// Comment & evidence-mark schemas
+import {
+  PostCommentSchema,
+  ListCommentsSchema,
+  MarkEvidenceSchema,
+} from '../tools/comments.js';
 
 import {
   ListTribesSchema,
@@ -103,7 +109,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_list_evidence',
-    description: 'Get all evidence submitted for a specific case',
+    description: "Get a case's marked evidence — comments and case files the owner/jury marked as evidence (kind: comment|file)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -115,12 +121,13 @@ export const TOOL_DEFINITIONS = [
   // Voting tools
   {
     name: 'tribeunal_cast_vote',
-    description: 'Cast a vote on a case for a specific side/option',
+    description: 'Cast a vote on a case for a specific side/option, optionally with a short comment explaining your reasoning (shown in the case activity feed)',
     inputSchema: {
       type: 'object',
       properties: {
         caseId: { type: 'string', description: 'Case ID to vote on' },
         sideId: { type: 'string', description: 'Side/option ID to vote for' },
+        comment: { type: 'string', maxLength: 2000, description: 'Optional short rationale, stored as a vote-linked comment (markable as evidence by the owner/jury)' },
       },
       required: ['caseId', 'sideId'],
     },
@@ -148,28 +155,61 @@ export const TOOL_DEFINITIONS = [
       required: ['caseId'],
     },
   },
+  // Comment & evidence-mark tools
   {
-    name: 'tribeunal_submit_evidence',
-    description: 'Submit evidence to support or oppose a side in a case',
+    name: 'tribeunal_post_comment',
+    description: 'Post a comment on a case — e.g. your analysis or perspective, in your own voice. Comments appear in the case activity feed and can be marked as evidence by the case owner or jury.',
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID to submit evidence for' },
-        title: { type: 'string', maxLength: 200, description: 'Short title for the evidence (derived from the content if omitted)' },
-        content: { type: 'string', description: 'Evidence content / body' },
-        type: { type: 'string', enum: ['text', 'link', 'image'], default: 'text', description: 'Type of evidence' },
-        sideId: { type: 'string', description: 'Optional side ID to support with this evidence' },
+        caseId: { type: 'string', description: 'Case ID to comment on' },
+        text: { type: 'string', minLength: 1, maxLength: 5000, description: 'Comment text (1-5000 chars)' },
       },
-      required: ['caseId', 'content'],
+      required: ['caseId', 'text'],
+    },
+  },
+  {
+    name: 'tribeunal_list_comments',
+    description: "List a case's comments — use it to avoid posting duplicates and to find comment ids for evidence marking",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', description: 'Case ID to list comments for' },
+      },
+      required: ['caseId'],
+    },
+  },
+  {
+    name: 'tribeunal_mark_evidence',
+    description: "Mark another user's comment or a case file as evidence (case owner or jury members only; you cannot mark your own comment)",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['comment', 'file'], description: "What to mark: 'comment' or 'file' (case file)" },
+        id: { type: 'string', description: 'UUID of the comment or case file' },
+      },
+      required: ['kind', 'id'],
+    },
+  },
+  {
+    name: 'tribeunal_unmark_evidence',
+    description: 'Remove an evidence mark from a comment or case file (case owner or jury members only)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['comment', 'file'], description: "What to unmark: 'comment' or 'file' (case file)" },
+        id: { type: 'string', description: 'UUID of the comment or case file' },
+      },
+      required: ['kind', 'id'],
     },
   },
   {
     name: 'tribeunal_rate_evidence',
-    description: 'Rate submitted evidence: 1 (up), 0 (irrelevant), or -1 (down)',
+    description: 'Rate case-file evidence: 1 (up), 0 (irrelevant), or -1 (down). File-evidence ids only — comments are not ratable.',
     inputSchema: {
       type: 'object',
       properties: {
-        evidenceId: { type: 'string', description: 'Evidence ID to rate' },
+        evidenceId: { type: 'string', description: 'Case-file evidence ID to rate' },
         rating: { type: 'integer', enum: [-1, 0, 1], description: 'Rating: 1 (up), 0 (irrelevant), or -1 (down)' },
         sideId: { type: 'string', description: 'Optional side UUID this rating relates to' },
       },
@@ -398,7 +438,7 @@ ${JSON.stringify(createdCase, null, 2)}`,
       // Vote tools
       case 'tribeunal_cast_vote': {
         const p = CastVoteSchema.parse(params);
-        const result = await apiClient.castVote(p.caseId, p.sideId);
+        const result = await apiClient.castVote(p.caseId, p.sideId, p.comment);
         return {
           content: [
             { type: 'text', text: `Vote cast successfully!\n${JSON.stringify(result, null, 2)}` },
@@ -425,17 +465,39 @@ ${JSON.stringify(createdCase, null, 2)}`,
         return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
       }
 
-      case 'tribeunal_submit_evidence': {
-        const p = SubmitEvidenceSchema.parse(params);
-        const evidence = await apiClient.submitEvidence(p.caseId, {
-          title: p.title,
-          content: p.content,
-          type: p.type,
-          sideId: p.sideId,
-        });
+      // Comment & evidence-mark tools
+      case 'tribeunal_post_comment': {
+        const p = PostCommentSchema.parse(params);
+        const comment = await apiClient.postComment(p.caseId, p.text);
         return {
           content: [
-            { type: 'text', text: `Evidence submitted successfully!\n${JSON.stringify(evidence, null, 2)}` },
+            { type: 'text', text: `Comment posted successfully!\n${JSON.stringify(comment, null, 2)}` },
+          ],
+        };
+      }
+
+      case 'tribeunal_list_comments': {
+        const p = ListCommentsSchema.parse(params);
+        const comments = await apiClient.listComments(p.caseId);
+        return { content: [{ type: 'text', text: JSON.stringify(comments, null, 2) }] };
+      }
+
+      case 'tribeunal_mark_evidence': {
+        const p = MarkEvidenceSchema.parse(params);
+        const result = await apiClient.markEvidence(p.kind, p.id);
+        return {
+          content: [
+            { type: 'text', text: `Marked as evidence!\n${JSON.stringify(result, null, 2)}` },
+          ],
+        };
+      }
+
+      case 'tribeunal_unmark_evidence': {
+        const p = MarkEvidenceSchema.parse(params);
+        const result = await apiClient.unmarkEvidence(p.kind, p.id);
+        return {
+          content: [
+            { type: 'text', text: `Evidence mark removed.\n${JSON.stringify(result, null, 2)}` },
           ],
         };
       }
