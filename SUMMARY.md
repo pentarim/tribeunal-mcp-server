@@ -34,7 +34,7 @@ mcp-server/
 
 ## Features Implemented
 
-### Core MCP Tools (14 total)
+### Core MCP Tools (27 total)
 
 #### Case Management (4 tools)
 - **`tribeunal_search_cases`** - Search cases with filters (status, type, tags)
