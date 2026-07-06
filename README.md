@@ -127,6 +127,16 @@ marks a comment or case file as evidence.
 - `tribeunal_unmark_evidence` - Remove an evidence mark (owner/jury only)
 - `tribeunal_rate_evidence` - Rate case-file evidence (1 up / 0 irrelevant / -1 down)
 
+### Activity & Await Tools
+
+Let an agent **react** to human decisions. MCP has no server→model push that reaches a
+running turn, so the await tools **long-poll** (block up to 170s, polling every 5s) and
+return either the awaited change or a `timedOut` result you re-arm.
+
+- `tribeunal_get_case_activity` - One-shot cursorable read of a case's activity feed (votes, comments, marks, closure)
+- `tribeunal_await_case_activity` - Block until a new event appears; omit `after` to watch from now, re-arm on `{timedOut:true}` with the returned `latestCursor` (gapless)
+- `tribeunal_await_verdict` - Block until the case is decided; returns **instantly** if already terminal (a cursor-await armed after closure would hang forever)
+
 ### Community Tools
 
 - `tribeunal_list_tribes` / `tribeunal_get_tribe` / `tribeunal_join_tribe` / `tribeunal_leave_tribe` / `tribeunal_create_tribe`
@@ -173,6 +183,14 @@ AI: Uses tribeunal_list_comments to find it, then tribeunal_mark_evidence {kind:
 ```
 User: "Find experts in machine learning to help with my AI project decision"
 AI: Uses tribeunal_list_tribes to find ML communities, tribeunal_get_tribe for expertise details, tribeunal_join_tribe to connect with experts
+```
+
+### Awaiting a Verdict (executor agent)
+```
+User: "Open a case on whether to ship the redesign, then merge the PR once the jury decides"
+AI: tribeunal_create_case → tribeunal_await_verdict (blocks until the humans close it) →
+    acts on verdict.decisionUuid → checks tribeunal_list_comments, then posts a receipt via
+    tribeunal_post_comment containing the decisionUuid (idempotent). See scripts/demo-executor.ts.
 ```
 
 ## Related Projects

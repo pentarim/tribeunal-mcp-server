@@ -1,5 +1,26 @@
 # Tribeunal MCP Server Changelog
 
+## [1.2.0] - 2026-07-06
+
+### Added
+- Three agent-await tools (30 tools total) so an executor agent can react to human decisions:
+  - `tribeunal_get_case_activity` — one-shot cursorable read of the case activity feed
+  - `tribeunal_await_case_activity` — long-poll (≤170s, 5s interval) for new events; re-armable with a gapless cursor
+  - `tribeunal_await_verdict` — long-poll for the verdict; returns instantly when the case is already terminal
+- `TribeunalAPIClient.getCaseActivity()` + `CaseActivityPage`/`CaseVerdict` types.
+- `scripts/dispatch.ts` (CLI tool harness) and `scripts/demo-executor.ts` (executor story).
+- `tests/activity.test.ts` + `npm run test:unit` (node --test via tsx).
+
+### Changed
+- `dispatchToolCall(apiClient, name, args, ctx?)` gains an optional 4th `ctx`
+  ({ reportProgress?, signal?, sleep? }); the stdio path is unchanged.
+- Worker (`worker/src/mcp-agent.ts`) streams `notifications/progress` (per the request's
+  `progressToken`) and honors client cancellation (`extra.signal`) for the await tools.
+
+### Notes
+- Long-poll (not server push) is deliberate: MCP push never reaches the model's turn and
+  Claude Desktop caps a remote tool call at ~4 min, hence the 170s ceiling with re-arm.
+
 ## [1.1.0] - 2025-01-10
 
 ### Added

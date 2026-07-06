@@ -34,7 +34,7 @@ mcp-server/
 
 ## Features Implemented
 
-### Core MCP Tools (27 total)
+### Core MCP Tools (30 total)
 
 #### Case Management (4 tools)
 - **`tribeunal_search_cases`** - Search cases with filters (status, type, tags)
@@ -53,6 +53,11 @@ mcp-server/
 - **`tribeunal_mark_evidence`** - Mark another user's comment or a case file as evidence (owner/jury)
 - **`tribeunal_unmark_evidence`** - Remove an evidence mark (owner/jury)
 - **`tribeunal_rate_evidence`** - Rate case-file evidence (1 up / 0 irrelevant / -1 down)
+
+#### Activity & Agent-Await (3 tools)
+- **`tribeunal_get_case_activity`** - One-shot cursorable read of the case activity feed
+- **`tribeunal_await_case_activity`** - Long-poll (≤170s, 5s interval) for new events; re-armable, gapless cursor
+- **`tribeunal_await_verdict`** - Long-poll for the verdict; instant when the case is already terminal
 
 #### Tribe Management (5 tools)
 - **`tribeunal_list_tribes`** - Browse available tribes

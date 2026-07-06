@@ -177,6 +177,41 @@ await client.callTool('tribeunal_mark_evidence', { kind: 'comment', id: 'comment
 await client.callTool('tribeunal_mark_evidence', { kind: 'file', id: 'case-file-uuid' });
 ```
 
+### Await a Verdict (executor pattern)
+
+```typescript
+// 1. Open the question for the humans to decide.
+const created = await client.callTool('tribeunal_create_case', {
+  title: 'Did the homepage redesign land well?',
+  description: 'Ship the follow-up automatically once the jury decides.',
+  type: 'poll',
+  sides: [{ name: 'Ship it' }, { name: 'Not yet' }],
+});
+const caseId = /* uuid from created */;
+
+// 2. Block until the case reaches a verdict (returns instantly if already terminal).
+//    On the worker transport this streams notifications/progress every 5s.
+const result = await client.callTool('tribeunal_await_verdict', { caseId, timeoutS: 150 });
+// result: leads with `Verdict: "Ship it" by unanimous (1/1)` then JSON
+// { timedOut, waitedS, verdict: { decided, decisionUuid, typeName, winningSides, ... } }
+
+// If it timed out short of a verdict, re-arm with another await_verdict call.
+
+// 3. Act on verdict.decisionUuid, then post an IDEMPOTENT receipt.
+const comments = await client.callTool('tribeunal_list_comments', { caseId });
+// skip if a comment already contains decisionUuid; otherwise:
+await client.callTool('tribeunal_post_comment', {
+  caseId,
+  text: `receipt decision ${decisionUuid}: merged the redesign PR`,
+});
+
+// To watch a specific event type instead of the verdict, long-poll the feed and re-arm
+// on timeout with the returned latestCursor (gapless):
+const page = await client.callTool('tribeunal_await_case_activity', {
+  caseId, types: ['vote'], timeoutS: 120,
+}); // { events, latestCursor, timedOut, waitedS }
+```
+
 ## Tribe Management Examples
 
 ### Browse Technology Tribes
