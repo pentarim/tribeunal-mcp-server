@@ -104,7 +104,12 @@ async function poll(
     const waitS = Math.min(POLL_INTERVAL_S, remaining);
     await sleep(waitS * 1000);
     elapsedS += waitS;
-    await ctx.reportProgress?.(elapsedS, timeoutS, `${label}: waiting ${elapsedS}/${timeoutS}s`);
+    // Progress is best-effort: a transport hiccup must not fail the wait.
+    try {
+      await ctx.reportProgress?.(elapsedS, timeoutS, `${label}: waiting ${elapsedS}/${timeoutS}s`);
+    } catch {
+      // ignore
+    }
 
     if (ctx.signal?.aborted) break;
     page = await fetchPage();
@@ -168,6 +173,9 @@ export async function awaitVerdict(
 export function verdictHeadline(result: AwaitResult): string | null {
   const v = result.verdict;
   if (v === null) return null;
-  const winnerVotes = v.sides.filter((s) => s.isWinner).reduce((n, s) => n + s.totalVotes, 0);
+  // Defensive: getCaseActivity casts the response without runtime validation,
+  // so a malformed verdict block must degrade to a headline, not throw.
+  const winners = Array.isArray(v.sides) ? v.sides.filter((s) => s.isWinner) : [];
+  const winnerVotes = winners.reduce((n, s) => n + s.totalVotes, 0);
   return `Verdict: "${v.name ?? '—'}" by ${v.typeName} (${winnerVotes}/${v.totalVotes})`;
 }
