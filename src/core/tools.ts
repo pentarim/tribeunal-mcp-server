@@ -42,6 +42,17 @@ import {
   JuryDutyHistorySchema,
 } from '../tools/jury-duty.js';
 
+// Activity feed + agent-await schemas and loops
+import {
+  GetCaseActivitySchema,
+  AwaitCaseActivitySchema,
+  AwaitVerdictSchema,
+  awaitCaseActivity,
+  awaitVerdict,
+  verdictHeadline,
+  type AwaitContext,
+} from '../tools/activity.js';
+
 /**
  * The canonical list of tool definitions advertised via `tools/list`.
  *
@@ -214,6 +225,50 @@ export const TOOL_DEFINITIONS = [
         sideId: { type: 'string', description: 'Optional side UUID this rating relates to' },
       },
       required: ['evidenceId', 'rating'],
+    },
+  },
+  // Activity feed & agent-await tools
+  {
+    name: 'tribeunal_get_case_activity',
+    description:
+      "Read a page of a case's activity feed (votes, comments, evidence marks, jury joins, closure) as a cursorable event stream. Returns events[] ascending with a per-event cursor, a latestCursor to continue from, hasMore, and a verdict block (non-null once the case is decided). Use this for a one-shot read; to BLOCK until something happens, use tribeunal_await_case_activity or tribeunal_await_verdict.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', description: 'Case ID or UUID whose activity to read' },
+        after: { type: 'string', description: 'Opaque cursor from a previous response; omit for the tail (latest events)' },
+        types: { type: 'array', items: { type: 'string', enum: ['vote', 'vote_revoked', 'comment', 'evidence_marked', 'evidence_unmarked', 'jury_joined', 'trial_closed'] }, description: 'Restrict to these event types' },
+        limit: { type: 'number', minimum: 1, maximum: 100, default: 50, description: 'Max events (1-100, default 50)' },
+      },
+      required: ['caseId'],
+    },
+  },
+  {
+    name: 'tribeunal_await_case_activity',
+    description:
+      "Block until a NEW event appears on a case (long-poll, up to timeoutS seconds). Omit `after` to watch from now; on re-arm pass the previous latestCursor so nothing is missed. Returns {events, latestCursor, timedOut, waitedS, ...}. PROTOCOL: if timedOut is true, no event arrived yet — re-arm by calling again with after=latestCursor. Check caseEndsAt to know when activity is expected and STOP re-arming well past it (tell the human instead of looping forever).",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', description: 'Case ID or UUID to watch' },
+        after: { type: 'string', description: 'Cursor to watch from; omit to anchor at the current tail ("watch from now")' },
+        types: { type: 'array', items: { type: 'string', enum: ['vote', 'vote_revoked', 'comment', 'evidence_marked', 'evidence_unmarked', 'jury_joined', 'trial_closed'] }, description: 'Only wake for these event types' },
+        timeoutS: { type: 'integer', minimum: 5, maximum: 170, default: 120, description: 'Seconds to block (5-170). On timeout, re-arm with the returned latestCursor.' },
+      },
+      required: ['caseId'],
+    },
+  },
+  {
+    name: 'tribeunal_await_verdict',
+    description:
+      "Block until a case reaches its VERDICT (terminal decision), up to timeoutS seconds — returns INSTANTLY if the case is already decided (unlike a cursor-await, which would hang forever after closure). Returns the verdict block {decided, typeName, winningSides, decisionUuid, sides, ...}. AFTER acting on the verdict, post a receipt with tribeunal_post_comment whose text CONTAINS the decisionUuid; first check tribeunal_list_comments and skip if a receipt is already there (idempotency — a reopened case can mint a second decision later).",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', description: 'Case ID or UUID whose verdict to await' },
+        timeoutS: { type: 'integer', minimum: 5, maximum: 170, default: 150, description: 'Seconds to block (5-170); instant if already terminal' },
+      },
+      required: ['caseId'],
     },
   },
   // Tribe tools
@@ -389,6 +444,7 @@ export async function dispatchToolCall(
   apiClient: TribeunalAPIClient,
   toolName: string,
   args: unknown,
+  ctx: AwaitContext = {},
 ): Promise<ToolCallResult> {
   const params = (args ?? {}) as Record<string, unknown>;
 
@@ -480,6 +536,27 @@ ${JSON.stringify(createdCase, null, 2)}`,
         const p = ListCommentsSchema.parse(params);
         const comments = await apiClient.listComments(p.caseId);
         return { content: [{ type: 'text', text: JSON.stringify(comments, null, 2) }] };
+      }
+
+      // Activity feed & agent-await tools
+      case 'tribeunal_get_case_activity': {
+        const p = GetCaseActivitySchema.parse(params);
+        const page = await apiClient.getCaseActivity(p.caseId, { after: p.after, types: p.types, limit: p.limit });
+        return { content: [{ type: 'text', text: JSON.stringify(page, null, 2) }] };
+      }
+
+      case 'tribeunal_await_case_activity': {
+        const p = AwaitCaseActivitySchema.parse(params);
+        const result = await awaitCaseActivity(apiClient, p, ctx);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'tribeunal_await_verdict': {
+        const p = AwaitVerdictSchema.parse(params);
+        const result = await awaitVerdict(apiClient, p, ctx);
+        const headline = verdictHeadline(result);
+        const body = JSON.stringify(result, null, 2);
+        return { content: [{ type: 'text', text: headline ? `${headline}\n\n${body}` : body }] };
       }
 
       case 'tribeunal_mark_evidence': {

@@ -60,6 +60,45 @@ export interface TribeunalAPIClientConfig {
   httpsAgent?: unknown;
 }
 
+/** One event in the case-activity feed. */
+export interface CaseActivityEvent {
+  cursor: string;
+  type: string;
+  actorUsername: string;
+  actorIsAi: boolean;
+  sideUuid: string | null;
+  sideName: string | null;
+  sideColor: number | null;
+  text: string | null;
+  refUuid: string | null;
+  createdAt: string;
+}
+
+/** The machine-readable verdict block (non-null once the case is terminal). */
+export interface CaseVerdict {
+  decided: boolean;
+  decisionUuid: string | null;
+  type: number;
+  typeName: string;
+  name: string | null;
+  text: string | null;
+  winningSides: Array<{ uuid: string; name: string | null }>;
+  sides: Array<{ uuid: string; name: string | null; totalVotes: number; votePercentage: number; isWinner: boolean }>;
+  totalVotes: number;
+  decidedAt: string | null;
+}
+
+/** Response of GET /api/cases/{uuid}/activity. */
+export interface CaseActivityPage {
+  caseUuid: string;
+  caseState: string;
+  caseEndsAt: string | null;
+  events: CaseActivityEvent[];
+  latestCursor: string | null;
+  hasMore: boolean;
+  verdict: CaseVerdict | null;
+}
+
 export class TribeunalAPIClient {
   private client: AxiosInstance;
   private bearerToken: string | undefined;
@@ -123,6 +162,23 @@ export class TribeunalAPIClient {
   async getCase(id: string) {
     const response = await this.client.get(`/cases/${id}`);
     return response.data;
+  }
+
+  /**
+   * Fetch a page of the case-activity feed. Each call is a sub-second request,
+   * far under the 30s axios timeout, so the await tools can poll it on a fixed
+   * interval. `after` is an opaque cursor (omitted = tail of the latest events).
+   */
+  async getCaseActivity(
+    caseId: string,
+    opts: { after?: string; types?: string[]; limit?: number } = {},
+  ): Promise<CaseActivityPage> {
+    const params: Record<string, string | number> = {};
+    if (opts.after) params.after = opts.after;
+    if (opts.types && opts.types.length) params.types = opts.types.join(',');
+    if (opts.limit !== undefined) params.limit = opts.limit;
+    const response = await this.client.get(`/cases/${caseId}/activity`, { params });
+    return response.data as CaseActivityPage;
   }
 
   async createCase(data: {
