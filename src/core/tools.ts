@@ -6,6 +6,7 @@ import {
   SearchCasesSchema,
   GetCaseSchema,
   CreateCaseSchema,
+  CloseCaseSchema,
   ListEvidenceSchema,
 } from '../tools/cases.js';
 
@@ -117,6 +118,18 @@ export const TOOL_DEFINITIONS = [
         id: { type: 'string', description: 'Case ID or UUID' },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'tribeunal_close_case',
+    description:
+      'Close one of YOUR open cases early (case owner or admin only). Pulls the voting deadline to now and triggers the verdict pipeline; the case must currently be open, and the decision is determined asynchronously. Follow up with tribeunal_await_verdict to read the outcome.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', description: 'UUID of the open case to close early (owner or admin only)' },
+      },
+      required: ['caseId'],
     },
   },
   {
@@ -484,6 +497,19 @@ ${JSON.stringify(createdCase, null, 2)}`,
         const p = GetCaseSchema.parse(params);
         const found = await apiClient.getCase(p.id);
         return { content: [{ type: 'text', text: JSON.stringify(found, null, 2) }] };
+      }
+
+      case 'tribeunal_close_case': {
+        const p = CloseCaseSchema.parse(params);
+        const result = await apiClient.closeCase(p.caseId);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Case closed — the verdict is being determined.\n${JSON.stringify(result, null, 2)}`,
+            },
+          ],
+        };
       }
 
       case 'tribeunal_list_evidence': {

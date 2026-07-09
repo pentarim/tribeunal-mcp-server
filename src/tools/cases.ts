@@ -32,3 +32,7 @@ export const CreateCaseSchema = z.object({
 export const ListEvidenceSchema = z.object({
   caseId: z.string().describe('Case ID to get evidence for'),
 });
+
+export const CloseCaseSchema = z.object({
+  caseId: z.string().describe('UUID of the open case to close early (you must be the case owner, or an admin)'),
+});

@@ -199,6 +199,14 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
+  async closeCase(caseId: string) {
+    // POST /api/cases/{uuid}/close — the API Platform close operation (uses the /api
+    // baseURL like createCase, not baseOrigin). No request body. Owner/admin only,
+    // open cases only; the verdict is determined asynchronously by the backend pipeline.
+    const response = await this.client.post(`/cases/${caseId}/close`);
+    return response.data;
+  }
+
   // Vote endpoints (these routes have no /api/ prefix)
   async castVote(caseId: string, sideId: string, comment?: string) {
     const params = new URLSearchParams();
