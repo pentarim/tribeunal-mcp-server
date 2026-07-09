@@ -108,6 +108,7 @@ Add to your `.mcp.json` or Claude Desktop config:
 - `tribeunal_create_case` - Create a case for community decision-making
 - `tribeunal_search_cases` - Find cases by query, status, type, or tags
 - `tribeunal_get_case` - Get detailed case information (sides, comments, activity)
+- `tribeunal_close_case` - Close one of your open cases early (owner/admin) to trigger the verdict
 - `tribeunal_list_evidence` - List a case's marked evidence (comments + case files)
 
 ### Voting Tools

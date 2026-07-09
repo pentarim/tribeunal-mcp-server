@@ -22,7 +22,7 @@ import type { Env, UserProps } from './types';
  *
  * Tools are registered on the low-level MCP `Server` (exposed by `McpServer` as
  * `.server`) using the SAME JSON-Schema `TOOL_DEFINITIONS` and `dispatchToolCall`
- * the stdio transport uses. This keeps the 30 tools byte-identical across both
+ * the stdio transport uses. This keeps the 31 tools byte-identical across both
  * transports and sidesteps re-deriving Zod shapes for the high-level helper.
  *
  * The three agent-await tools long-poll: their handler blocks for up to
@@ -55,7 +55,7 @@ export class TribeunalMCP extends McpAgent<Env, Record<string, never>, UserProps
   async init(): Promise<void> {
     const lowLevel = this.server.server;
 
-    // tools/list — advertise the shared 30 tool definitions verbatim.
+    // tools/list — advertise the shared 31 tool definitions verbatim.
     lowLevel.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: TOOL_DEFINITIONS as unknown as Array<{
         name: string;

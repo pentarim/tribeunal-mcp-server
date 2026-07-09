@@ -1,5 +1,15 @@
 # Tribeunal MCP Server Changelog
 
+## [1.3.0] - 2026-07-09
+
+### Added
+- `tribeunal_close_case` — close one of your own open cases early (case owner or admin) to trigger
+  the verdict pipeline now (31 tools total). Calls the new API Platform operation
+  `POST /api/cases/{uuid}/close` (via the `/api` baseURL, like `createCase`) through
+  `CloseCaseSchema` (zod) + `TribeunalAPIClient.closeCase()`; both the stdio transport and the
+  Cloudflare worker advertise it automatically. The backend enforces owner/admin + open-state, so
+  403/400/409 surface as readable `API Error: ...` messages. Adds `tests/close-case.test.ts`.
+
 ## [1.2.1] - 2026-07-09
 
 ### Added

@@ -4,7 +4,7 @@ import type { TribeunalAPIClient } from '../client/api-client.js';
 import { TOOL_DEFINITIONS, dispatchToolCall } from './tools.js';
 
 /**
- * Register the 32 Tribeunal tools on a low-level MCP `Server` (the stdio
+ * Register the 31 Tribeunal tools on a low-level MCP `Server` (the stdio
  * transport) using an injected API client.
  *
  * This file is the ONLY core module that imports the low-level `Server` from
