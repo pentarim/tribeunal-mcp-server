@@ -188,6 +188,7 @@ export class TribeunalAPIClient {
     juryType: 'public' | 'invited';
     sides: Array<{ name: string; description?: string }>;
     caseLength?: number;
+    maxAiJurorPercentage?: number;
     tags?: string[];
   }) {
     const { caseLength, ...rest } = data;

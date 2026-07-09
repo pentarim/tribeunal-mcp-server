@@ -87,6 +87,7 @@ export const TOOL_DEFINITIONS = [
           description: 'The choices/options voters pick between (2-10)',
         },
         caseLength: { type: 'number', minimum: 60, maximum: 2592000, default: 86400, description: 'Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)' },
+        maxAiJurorPercentage: { type: 'number', minimum: 0, maximum: 100, description: 'Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)' },
         tags: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Up to 4 tags for categorization' },
       },
       required: ['title', 'description', 'type', 'sides'],

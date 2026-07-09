@@ -1,5 +1,13 @@
 # Tribeunal MCP Server Changelog
 
+## [1.2.1] - 2026-07-09
+
+### Added
+- `tribeunal_create_case` gains an optional `maxAiJurorPercentage` (integer 0-100) parameter — the
+  per-case AI juror cap that controls how much of a case's jury may be AI. Wired through
+  `CreateCaseSchema` (zod) and `TribeunalAPIClient.createCase` (same field name as the API, no
+  mapping). Omitting it defers to the backend default (50).
+
 ## [1.2.0] - 2026-07-06
 
 ### Added

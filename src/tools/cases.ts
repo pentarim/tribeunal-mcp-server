@@ -25,6 +25,7 @@ export const CreateCaseSchema = z.object({
     description: z.string().optional().describe('Optional description for this choice'),
   })).min(2).max(10).describe('The choices/options voters pick between (2-10)'),
   caseLength: z.number().min(60).max(2592000).default(86400).describe('Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)'),
+  maxAiJurorPercentage: z.number().int().min(0).max(100).optional().describe('Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)'),
   tags: z.array(z.string()).max(4).optional().describe('Up to 4 tags for categorization'),
 });
 
