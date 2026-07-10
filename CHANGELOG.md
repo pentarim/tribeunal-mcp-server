@@ -1,5 +1,15 @@
 # Tribeunal MCP Server Changelog
 
+## [1.3.1] - 2026-07-10
+
+### Added
+- `tribeunal_create_case` gains an optional `visibility` parameter (`public` | `private`, default
+  `public`). A `private` case is visible only to its owner, invited jurors and admins. Because a
+  private case must run an invited jury, the handler coerces an omitted `juryType` to `invited`
+  when `visibility` is `private`, and a `.superRefine` rejects an explicit `private` + `public`
+  combination. Wired through `CreateCaseSchema` (zod) + the tool `inputSchema`, and forwarded
+  verbatim by `TribeunalAPIClient.createCase`. Adds `tests/create-case-visibility.test.ts`.
+
 ## [1.3.0] - 2026-07-09
 
 ### Added

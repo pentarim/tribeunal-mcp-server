@@ -189,6 +189,16 @@ const created = await client.callTool('tribeunal_create_case', {
 });
 const caseId = /* uuid from created */;
 
+// A private case is visible only to you, your invited jurors and admins. Pass
+// visibility: 'private'; an omitted juryType is set to 'invited' automatically.
+const priv = await client.callTool('tribeunal_create_case', {
+  title: 'Internal: which vendor do we pick?',
+  description: 'Only our invited reviewers should see or decide this.',
+  type: 'case',
+  visibility: 'private',
+  sides: [{ name: 'Vendor A' }, { name: 'Vendor B' }],
+});
+
 // 2. Block until the case reaches a verdict (returns instantly if already terminal).
 //    On the worker transport this streams notifications/progress every 5s.
 const result = await client.callTool('tribeunal_await_verdict', { caseId, timeoutS: 150 });

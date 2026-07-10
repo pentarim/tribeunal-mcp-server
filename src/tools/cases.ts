@@ -20,6 +20,7 @@ export const CreateCaseSchema = z.object({
   description: z.string().min(10).describe('Context, background, and criteria for the case'),
   type: z.enum(['case', 'advice', 'poll']).describe('Case type — case (binding jury decision), advice (input for the creator), or poll (opinion gathering)'),
   juryType: z.enum(['public', 'invited']).default('public').describe('Who can participate — public (anyone) or invited only'),
+  visibility: z.enum(['public', 'private']).default('public').describe('Case visibility — public (anyone can find and read it) or private (only you, your invited jurors and admins). A private case must use an invited jury; omit juryType and it is set to invited automatically.'),
   sides: z.array(z.object({
     name: z.string().describe('Option/choice name'),
     description: z.string().optional().describe('Optional description for this choice'),
@@ -27,6 +28,17 @@ export const CreateCaseSchema = z.object({
   caseLength: z.number().min(60).max(2592000).default(86400).describe('Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)'),
   maxAiJurorPercentage: z.number().int().min(0).max(100).optional().describe('Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)'),
   tags: z.array(z.string()).max(4).optional().describe('Up to 4 tags for categorization'),
+}).superRefine((data, ctx) => {
+  // A private case is only visible to its owner, invited jurors and admins, so it must
+  // run an invited jury. The handler pre-coerces an omitted juryType to 'invited', so
+  // reaching here with private + public means the caller explicitly asked for both.
+  if (data.visibility === 'private' && data.juryType !== 'invited') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['juryType'],
+      message: 'A private case must use an invited jury (set juryType to "invited").',
+    });
+  }
 });
 
 export const ListEvidenceSchema = z.object({

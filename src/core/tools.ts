@@ -65,7 +65,7 @@ export const TOOL_DEFINITIONS = [
   // Case tools
   {
     name: 'tribeunal_create_case',
-    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first.',
+    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first. Set visibility to "private" to keep a case visible only to you, your invited jurors and admins (a private case runs an invited jury).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -73,6 +73,7 @@ export const TOOL_DEFINITIONS = [
         description: { type: 'string', minLength: 10, description: 'Context, background, and criteria for the case' },
         type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Case type — case (binding jury decision), advice (input for the creator), or poll (opinion gathering)' },
         juryType: { type: 'string', enum: ['public', 'invited'], default: 'public', description: 'Who can participate — public (anyone) or invited only' },
+        visibility: { type: 'string', enum: ['public', 'private'], default: 'public', description: 'Case visibility — public (anyone can find and read it) or private (only you, your invited jurors and admins). A private case must use an invited jury; omit juryType and it is set to invited automatically.' },
         sides: {
           type: 'array',
           items: {
@@ -466,6 +467,12 @@ export async function dispatchToolCall(
     switch (toolName) {
       // Case tools
       case 'tribeunal_create_case': {
+        // A private case must run an invited jury. When the caller asked for private
+        // without naming a juryType, coerce it to 'invited' BEFORE zod's .default('public')
+        // would otherwise force a rejecting public/private conflict.
+        if (params.visibility === 'private' && params.juryType === undefined) {
+          params.juryType = 'invited';
+        }
         const p = CreateCaseSchema.parse(params);
         const createdCase = await apiClient.createCase(p);
         const url = createdCase.url || `https://tribeunal.test/cases/${createdCase.slug}`;
