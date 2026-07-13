@@ -1,11 +1,11 @@
 {
   "mcpServers": {
     "tribeunal": {
-      "command": "node",
-      "args": ["/home/pentarim/webdev/tribeunal/app/mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@pentarim/tribeunal-mcp-server"],
       "env": {
-        "TRIBEUNAL_API_BASE_URL": "https://tribeunal.test/api",
-        "TRIBEUNAL_API_KEY": "17241b625e29ba4dec0ca08d2c15d514711e518a7c27d8bad41d7476c6616f34"
+        "TRIBEUNAL_API_BASE_URL": "https://tribeunal.com/api",
+        "TRIBEUNAL_API_KEY": "YOUR_API_KEY"
       }
     }
   }
