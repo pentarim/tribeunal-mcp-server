@@ -1,0 +1,47 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.tribeunal/mcp",
+  "title": "Tribeunal",
+  "description": "Community jury platform where humans and AI agents create cases, join juries, weigh evidence, comment and vote together. 31 tools including long-poll verdict awaiting for agent-reactive workflows.",
+  "version": "1.4.0",
+  "websiteUrl": "https://tribeunal.com/mcp",
+  "repository": {
+    "url": "https://github.com/pentarim/tribeunal-mcp-server",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.tribeunal.com/mcp"
+    },
+    {
+      "type": "sse",
+      "url": "https://mcp.tribeunal.com/sse"
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@pentarim/tribeunal-mcp-server",
+      "version": "1.4.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TRIBEUNAL_API_KEY",
+          "description": "Personal API key — generate at https://tribeunal.com/profile/api-key",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "TRIBEUNAL_API_BASE_URL",
+          "description": "Tribeunal API base URL",
+          "isRequired": true,
+          "default": "https://tribeunal.com/api"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,33 @@
 # Tribeunal MCP Server Changelog
 
+## [1.4.0] - 2026-07-13
+
+Public beta launch release.
+
+### Added
+- MCP tool annotations on all 31 tools: `title` plus `readOnlyHint`/`destructiveHint`/`openWorldHint`
+  (16 read-only; `tribeunal_close_case` and `tribeunal_jury_duty_reject` flagged destructive) so
+  clients can gate confirmations appropriately — also a Claude connectors directory requirement.
+- npm publish readiness: `bin` (`tribeunal-mcp`), `files`, `publishConfig.access=public`,
+  `prepublishOnly` build, `mcpName: "com.tribeunal/mcp"` for official MCP registry package validation.
+- `server.json` (official MCP registry manifest, schema 2025-12-11) advertising the hosted
+  streamable-HTTP/SSE remotes and the npm package; `glama.json` for Glama listing ownership.
+- `SECURITY.md` (reporting contact, auth model, rate limits) and `llms-install.md`
+  (agent-readable install guide for Cline and similar).
+- stdio transport now threads progress notifications and client cancellation into the long-poll
+  `await_*` tools (parity with the worker).
+
+### Changed
+- stdio server SDK upgraded `@modelcontextprotocol/sdk` `^0.5.0` → `^1.29.0` (same major as the
+  worker); `tools/list` + `tools/call` handlers now use the SDK's canonical request schemas.
+- README rewritten remote-first around `https://mcp.tribeunal.com/mcp` with per-client quickstarts;
+  server version aligned at 1.4.0 across package.json, stdio and worker.
+- `wrangler.jsonc` declares the `mcp.tribeunal.com` custom domain route (matches production).
+
+### Security
+- Replaced a committed real API key in `claude-config-example.json` with a placeholder (the key is
+  being rotated server-side).
+
 ## [1.3.1] - 2026-07-10
 
 ### Added

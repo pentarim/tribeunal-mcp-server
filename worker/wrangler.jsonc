@@ -57,15 +57,12 @@
 
   "dev": {
     "port": 8788
-  }
+  },
 
-  // ---------------------------------------------------------------------------
-  // Custom domain (decision 4a: mcp.tribeunal.com). Uncomment once the zone is
-  // on this Cloudflare account and the worker has been deployed at least once.
-  // A custom domain auto-provisions the edge cert and routes the apex path.
-  //
-  // "routes": [
-  //   { "pattern": "mcp.tribeunal.com", "custom_domain": true }
-  // ]
-  // ---------------------------------------------------------------------------
+  // Custom domain (decision 4a: mcp.tribeunal.com). Already bound in the
+  // Cloudflare dashboard and live in production — declared here so the config
+  // matches reality and survives redeploys.
+  "routes": [
+    { "pattern": "mcp.tribeunal.com", "custom_domain": true }
+  ]
 }

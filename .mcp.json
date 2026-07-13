@@ -40,7 +40,7 @@
         "workers-mcp",
         "run",
         "tribeunal-worker",
-        "https://tribeunal-mcp-worker.pententon.workers.dev",
+        "https://mcp.tribeunal.com",
         "/home/pentarim/webdev/tribeunal/mcp-server/worker"
       ]
     }
