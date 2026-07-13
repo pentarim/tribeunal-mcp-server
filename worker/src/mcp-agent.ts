@@ -34,7 +34,7 @@ export class TribeunalMCP extends McpAgent<Env, Record<string, never>, UserProps
   server = new McpServer(
     {
       name: 'tribeunal-mcp-server',
-      version: '1.0.0',
+      version: '1.4.0',
     },
     // We register tools on the low-level server via setRequestHandler (below),
     // so the `tools` capability must be declared explicitly — McpServer only
@@ -59,8 +59,10 @@ export class TribeunalMCP extends McpAgent<Env, Record<string, never>, UserProps
     lowLevel.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: TOOL_DEFINITIONS as unknown as Array<{
         name: string;
+        title?: string;
         description?: string;
         inputSchema: Record<string, unknown>;
+        annotations?: Record<string, unknown>;
       }>,
     }));
 

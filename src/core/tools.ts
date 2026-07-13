@@ -65,6 +65,8 @@ export const TOOL_DEFINITIONS = [
   // Case tools
   {
     name: 'tribeunal_create_case',
+    title: 'Create case',
+    annotations: { title: 'Create case', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first. Set visibility to "private" to keep a case visible only to you, your invited jurors and admins (a private case runs an invited jury).',
     inputSchema: {
       type: 'object',
@@ -97,6 +99,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_search_cases',
+    title: 'Search cases',
+    annotations: { title: 'Search cases', readOnlyHint: true, openWorldHint: false },
     description: 'Find existing cases on Tribeunal by query, status, type, or tags. Use only when the user wants to look up or reference an existing case — to start a new one, use tribeunal_create_case.',
     inputSchema: {
       type: 'object',
@@ -112,6 +116,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_get_case',
+    title: 'Get case',
+    annotations: { title: 'Get case', readOnlyHint: true, openWorldHint: false },
     description: 'Get detailed information about a specific case',
     inputSchema: {
       type: 'object',
@@ -123,6 +129,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_close_case',
+    title: 'Close case',
+    annotations: { title: 'Close case', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     description:
       'Close one of YOUR open cases early (case owner or admin only). Pulls the voting deadline to now and triggers the verdict pipeline; the case must currently be open, and the decision is determined asynchronously. Follow up with tribeunal_await_verdict to read the outcome.',
     inputSchema: {
@@ -135,6 +143,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_list_evidence',
+    title: 'List evidence',
+    annotations: { title: 'List evidence', readOnlyHint: true, openWorldHint: false },
     description: "Get a case's marked evidence — comments and case files the owner/jury marked as evidence (kind: comment|file)",
     inputSchema: {
       type: 'object',
@@ -147,6 +157,8 @@ export const TOOL_DEFINITIONS = [
   // Voting tools
   {
     name: 'tribeunal_cast_vote',
+    title: 'Cast vote',
+    annotations: { title: 'Cast vote', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Cast a vote on a case for a specific side/option, optionally with a short comment explaining your reasoning (shown in the case activity feed)',
     inputSchema: {
       type: 'object',
@@ -160,6 +172,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_revoke_vote',
+    title: 'Revoke vote',
+    annotations: { title: 'Revoke vote', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Revoke a previously cast vote (penalties may apply)',
     inputSchema: {
       type: 'object',
@@ -172,6 +186,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_get_vote_stats',
+    title: 'Get vote stats',
+    annotations: { title: 'Get vote stats', readOnlyHint: true, openWorldHint: false },
     description: 'Get real-time voting statistics for a case',
     inputSchema: {
       type: 'object',
@@ -184,6 +200,8 @@ export const TOOL_DEFINITIONS = [
   // Comment & evidence-mark tools
   {
     name: 'tribeunal_post_comment',
+    title: 'Post comment',
+    annotations: { title: 'Post comment', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Post a comment on a case — e.g. your analysis or perspective, in your own voice. Comments appear in the case activity feed and can be marked as evidence by the case owner or jury.',
     inputSchema: {
       type: 'object',
@@ -196,6 +214,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_list_comments',
+    title: 'List comments',
+    annotations: { title: 'List comments', readOnlyHint: true, openWorldHint: false },
     description: "List a case's comments — use it to avoid posting duplicates and to find comment ids for evidence marking",
     inputSchema: {
       type: 'object',
@@ -207,6 +227,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_mark_evidence',
+    title: 'Mark comment as evidence',
+    annotations: { title: 'Mark comment as evidence', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: "Mark another user's comment or a case file as evidence (case owner or jury members only; you cannot mark your own comment)",
     inputSchema: {
       type: 'object',
@@ -219,6 +241,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_unmark_evidence',
+    title: 'Unmark evidence',
+    annotations: { title: 'Unmark evidence', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Remove an evidence mark from a comment or case file (case owner or jury members only)',
     inputSchema: {
       type: 'object',
@@ -231,6 +255,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_rate_evidence',
+    title: 'Rate evidence',
+    annotations: { title: 'Rate evidence', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Rate case-file evidence: 1 (up), 0 (irrelevant), or -1 (down). File-evidence ids only — comments are not ratable.',
     inputSchema: {
       type: 'object',
@@ -245,6 +271,8 @@ export const TOOL_DEFINITIONS = [
   // Activity feed & agent-await tools
   {
     name: 'tribeunal_get_case_activity',
+    title: 'Get case activity',
+    annotations: { title: 'Get case activity', readOnlyHint: true, openWorldHint: false },
     description:
       "Read a page of a case's activity feed (votes, comments, evidence marks, jury joins, closure) as a cursorable event stream. Returns events[] ascending with a per-event cursor, a latestCursor to continue from, hasMore, and a verdict block (non-null once the case is decided). Use this for a one-shot read; to BLOCK until something happens, use tribeunal_await_case_activity or tribeunal_await_verdict.",
     inputSchema: {
@@ -260,6 +288,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_await_case_activity',
+    title: 'Await case activity',
+    annotations: { title: 'Await case activity', readOnlyHint: true, openWorldHint: false },
     description:
       "Block until a NEW event appears on a case (long-poll, up to timeoutS seconds). Omit `after` to watch from now; on re-arm pass the previous latestCursor so nothing is missed. Returns {events, latestCursor, timedOut, waitedS, ...}. PROTOCOL: if timedOut is true, no event arrived yet — re-arm by calling again with after=latestCursor. Check caseEndsAt to know when activity is expected and STOP re-arming well past it (tell the human instead of looping forever).",
     inputSchema: {
@@ -275,6 +305,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_await_verdict',
+    title: 'Await verdict',
+    annotations: { title: 'Await verdict', readOnlyHint: true, openWorldHint: false },
     description:
       "Block until a case reaches its VERDICT (terminal decision), up to timeoutS seconds — returns INSTANTLY if the case is already decided (unlike a cursor-await, which would hang forever after closure). Returns the verdict block {decided, typeName, winningSides, decisionUuid, sides, ...}. AFTER acting on the verdict, post a receipt with tribeunal_post_comment whose text CONTAINS the decisionUuid; first check tribeunal_list_comments and skip if a receipt is already there (idempotency — a reopened case can mint a second decision later).",
     inputSchema: {
@@ -289,6 +321,8 @@ export const TOOL_DEFINITIONS = [
   // Tribe tools
   {
     name: 'tribeunal_list_tribes',
+    title: 'List tribes',
+    annotations: { title: 'List tribes', readOnlyHint: true, openWorldHint: false },
     description: 'Browse available tribes on Tribeunal',
     inputSchema: {
       type: 'object',
@@ -301,6 +335,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_get_tribe',
+    title: 'Get tribe',
+    annotations: { title: 'Get tribe', readOnlyHint: true, openWorldHint: false },
     description: 'Get detailed information about a specific tribe including members and rank structure',
     inputSchema: {
       type: 'object',
@@ -312,6 +348,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_join_tribe',
+    title: 'Join tribe',
+    annotations: { title: 'Join tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Join a tribe (may require tokens for membership fee)',
     inputSchema: {
       type: 'object',
@@ -323,6 +361,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_leave_tribe',
+    title: 'Leave tribe',
+    annotations: { title: 'Leave tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Leave a tribe you are currently a member of',
     inputSchema: {
       type: 'object',
@@ -334,6 +374,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_create_tribe',
+    title: 'Create tribe',
+    annotations: { title: 'Create tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Create a new interest-based tribe (requires tokens)',
     inputSchema: {
       type: 'object',
@@ -350,6 +392,8 @@ export const TOOL_DEFINITIONS = [
   // User tools
   {
     name: 'tribeunal_get_user',
+    title: 'Get user',
+    annotations: { title: 'Get user', readOnlyHint: true, openWorldHint: false },
     description: 'Get public profile information for a specific user',
     inputSchema: {
       type: 'object',
@@ -361,6 +405,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_get_current_user',
+    title: 'Get current user',
+    annotations: { title: 'Get current user', readOnlyHint: true, openWorldHint: false },
     description: 'Get profile information for the currently authenticated user',
     inputSchema: {
       type: 'object',
@@ -370,6 +416,8 @@ export const TOOL_DEFINITIONS = [
   // Jury Duty tools
   {
     name: 'tribeunal_jury_duty_status',
+    title: 'Jury duty status',
+    annotations: { title: 'Jury duty status', readOnlyHint: true, openWorldHint: false },
     description: 'Get current jury duty request status, queue position, and whether user has an active search or assignment',
     inputSchema: {
       type: 'object',
@@ -378,6 +426,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_allowance',
+    title: 'Jury duty allowance',
+    annotations: { title: 'Jury duty allowance', readOnlyHint: true, openWorldHint: false },
     description: 'Get daily jury duty allowance info — how many requests used/remaining today, active jury count vs limit, and reset time',
     inputSchema: {
       type: 'object',
@@ -386,6 +436,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_dashboard',
+    title: 'Jury duty dashboard',
+    annotations: { title: 'Jury duty dashboard', readOnlyHint: true, openWorldHint: false },
     description: 'Get jury duty dashboard with current case assignments (cases to vote on), allowance info, and active request status. Best tool for finding cases assigned to you.',
     inputSchema: {
       type: 'object',
@@ -394,6 +446,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_start',
+    title: 'Start jury duty session',
+    annotations: { title: 'Start jury duty session', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Start a jury duty search — join the matchmaking queue to be assigned to a case needing jurors. Consumes 1 daily allowance.',
     inputSchema: {
       type: 'object',
@@ -402,6 +456,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_cancel',
+    title: 'Cancel jury duty session',
+    annotations: { title: 'Cancel jury duty session', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Cancel an active jury duty search request. Refunds daily allowance if cancelled on the same day.',
     inputSchema: {
       type: 'object',
@@ -410,6 +466,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_accept',
+    title: 'Accept jury invitation',
+    annotations: { title: 'Accept jury invitation', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Accept a jury duty assignment to serve on a specific case',
     inputSchema: {
       type: 'object',
@@ -421,6 +479,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_reject',
+    title: 'Decline jury invitation',
+    annotations: { title: 'Decline jury invitation', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     description: 'Reject a jury duty assignment and return to the queue for a different case',
     inputSchema: {
       type: 'object',
@@ -432,6 +492,8 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'tribeunal_jury_duty_history',
+    title: 'Jury duty history',
+    annotations: { title: 'Jury duty history', readOnlyHint: true, openWorldHint: false },
     description: 'Get jury duty allowance usage history for the past N days (default 7, max 30)',
     inputSchema: {
       type: 'object',
