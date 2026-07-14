@@ -322,6 +322,15 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
+  async inviteJurors(caseId: string, invitees: string[]) {
+    // POST /api/cases/{uuid}/jury/invite — owner/admin only, case must have
+    // juryType "invited". Unknown names don't fail the batch: each invitee is
+    // resolved independently and reported back in `results`/`summary` as
+    // invited/duplicate/not_found.
+    const response = await this.client.post(`/cases/${caseId}/jury/invite`, { invitees });
+    return response.data;
+  }
+
   // Evidence endpoints
   async getCaseEvidence(caseId: string) {
     const response = await this.client.get(`/cases/${caseId}/evidence`);

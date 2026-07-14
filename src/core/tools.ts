@@ -41,6 +41,7 @@ import {
   JuryDutyAcceptSchema,
   JuryDutyRejectSchema,
   JuryDutyHistorySchema,
+  InviteJurorsSchema,
 } from '../tools/jury-duty.js';
 
 // Activity feed + agent-await schemas and loops
@@ -502,6 +503,22 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    name: 'tribeunal_invite_jurors',
+    title: 'Invite jurors',
+    annotations: { title: 'Invite jurors', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description:
+      'Invite users to the jury of a case you own (owner or admin only). The case must have juryType "invited" (e.g. created via tribeunal_create_case with juryType "invited" or visibility "private"). Accepts usernames or email addresses; each invitee is processed independently — the response reports invited / duplicate / not_found per entry.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', description: 'UUID of the case (owner or admin only)' },
+        invitees: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 1, maxItems: 50,
+                    description: 'Usernames or email addresses to invite (1-50)' },
+      },
+      required: ['caseId', 'invitees'],
+    },
+  },
 ] as const;
 
 /** Shape of the value an MCP `tools/call` handler must return. */
@@ -833,6 +850,20 @@ ${JSON.stringify(createdCase, null, 2)}`,
         const p = JuryDutyHistorySchema.parse(params);
         const history = await apiClient.getJuryDutyHistory(p.days);
         return { content: [{ type: 'text', text: JSON.stringify(history, null, 2) }] };
+      }
+
+      case 'tribeunal_invite_jurors': {
+        const p = InviteJurorsSchema.parse(params);
+        const result = await apiClient.inviteJurors(p.caseId, p.invitees);
+        const s = result.summary ?? {};
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Jury invitations processed — invited: ${s.invited ?? '?'}, duplicate: ${s.duplicate ?? '?'}, not found: ${s.not_found ?? '?'}.\n\n${JSON.stringify(result, null, 2)}`,
+            },
+          ],
+        };
       }
 
       default:

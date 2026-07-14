@@ -1,5 +1,15 @@
 # Tribeunal MCP Server Changelog
 
+## [1.5.0] - 2026-07-14
+
+### Added
+- `tribeunal_invite_jurors` (32 tools total) — case owner (or admin) invites users to the jury
+  by username or email address (1-50 per call). Each invitee is resolved independently and the
+  response reports `invited` / `duplicate` / `not_found` per entry, so unknown names don't fail
+  the batch. Backs onto the new `POST /api/cases/{uuid}/jury/invite` endpoint; the case must have
+  `juryType: "invited"`. Documented under the existing `jury:duty` OAuth scope — no new scope
+  required.
+
 ## [1.4.0] - 2026-07-13
 
 Public beta launch release.

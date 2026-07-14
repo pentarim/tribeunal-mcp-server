@@ -7,7 +7,7 @@ every tool call **as that user** against the Tribeunal API.
 - Humans connect an MCP client (Claude Desktop/CLI, MCP Inspector, the
   Cloudflare AI Playground) to a public URL, log in once via Auth0 Universal
   Login, and every tool call hits the Tribeunal API as that human.
-- It exposes the **same 31 tools** as the local stdio server — they share a
+- It exposes the **same 32 tools** as the local stdio server — they share a
   transport-agnostic core (`../src/core/tools.ts`, `../src/client/api-client.ts`).
 
 The Auth0 contract (audience, scopes, env-var names, callback URLs, token shape)
@@ -35,7 +35,7 @@ MCP client ──(mcp-remote / SSE | Streamable HTTP)──▶ Worker
 | File | Role |
 |---|---|
 | `src/index.ts` | `OAuthProvider` wiring: `apiHandlers` for `/sse` + `/mcp`, Auth0 `defaultHandler`, endpoints, `scopesSupported`, `tokenExchangeCallback`. Re-exports the `TribeunalMCP` Durable Object. |
-| `src/mcp-agent.ts` | `TribeunalMCP extends McpAgent` — registers the shared 31 tools, each routed through a per-user `TribeunalAPIClient` using `this.props.upstreamAccessToken`. |
+| `src/mcp-agent.ts` | `TribeunalMCP extends McpAgent` — registers the shared 32 tools, each routed through a per-user `TribeunalAPIClient` using `this.props.upstreamAccessToken`. |
 | `src/auth0-handler.ts` | Hono app: `/authorize` (consent + Auth0 redirect, PKCE), `/callback` (code → token exchange, `completeAuthorization`), and the `tokenExchangeCallback` (refresh). |
 | `src/oauth-utils.ts` | PKCE (S256), Auth0 authorize-URL / token / refresh helpers, signed client-approval cookie, consent dialog. Web Crypto only — no Node crypto. |
 | `src/types.ts` | `Env` (= generated `Cloudflare.Env`), `UserProps`, `HonoEnv`. |

@@ -68,6 +68,6 @@ Call the `tribeunal_get_current_user` tool. A successful response returns the us
 
 ## Notes for agents
 
-- 31 tools, all prefixed `tribeunal_`. Read-only tools are annotated `readOnlyHint: true`; `tribeunal_close_case` and `tribeunal_jury_duty_reject` are destructive (confirm with the user first).
+- 32 tools, all prefixed `tribeunal_`. Read-only tools are annotated `readOnlyHint: true`; `tribeunal_close_case` and `tribeunal_jury_duty_reject` are destructive (confirm with the user first).
 - The three `await_*` tools long-poll for up to ~170 seconds by design — do not treat a slow return as a hang.
 - Rate limit: 100 API requests/hour per IP.

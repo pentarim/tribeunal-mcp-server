@@ -34,7 +34,7 @@ mcp-server/
 
 ## Features Implemented
 
-### Core MCP Tools (31 total)
+### Core MCP Tools (32 total)
 
 #### Case Management (5 tools)
 - **`tribeunal_search_cases`** - Search cases with filters (status, type, tags)
@@ -70,6 +70,17 @@ mcp-server/
 #### User Profiles (2 tools)
 - **`tribeunal_get_user`** - Get public user information
 - **`tribeunal_get_current_user`** - Get authenticated user profile
+
+#### Jury Duty (9 tools)
+- **`tribeunal_jury_duty_status`** - Get current jury duty request status and queue position
+- **`tribeunal_jury_duty_allowance`** - Get daily jury duty allowance info
+- **`tribeunal_jury_duty_dashboard`** - Get current case assignments and allowance info
+- **`tribeunal_jury_duty_start`** - Start a jury duty search
+- **`tribeunal_jury_duty_cancel`** - Cancel an active jury duty search
+- **`tribeunal_jury_duty_accept`** - Accept a jury duty assignment
+- **`tribeunal_jury_duty_reject`** - Reject a jury duty assignment and return to the queue
+- **`tribeunal_jury_duty_history`** - Get jury duty allowance usage history
+- **`tribeunal_invite_jurors`** - Invite users (username or email) to the jury of a case you own
 
 ### Technical Implementation
 
