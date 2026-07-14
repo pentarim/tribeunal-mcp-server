@@ -15,7 +15,7 @@ import type { Env, UserProps } from './types';
  * Authentication is handled upstream by `@cloudflare/workers-oauth-provider`
  * (see `index.ts` + `auth0-handler.ts`): by the time `init()` runs, the user has
  * completed Auth0 Universal Login and `this.props` carries their Auth0 access
- * token. Every one of the 30 shared tools is therefore executed AS the
+ * token. Every one of the 32 shared tools is therefore executed AS the
  * logged-in human — the API client forwards `props.upstreamAccessToken` as a
  * Bearer token, which the Symfony resource server validates and maps to that
  * user.
