@@ -180,3 +180,21 @@ export function verdictHeadline(result: AwaitResult): string | null {
   const winnerVotes = winners.reduce((n, s) => n + s.totalVotes, 0);
   return `Verdict: "${v.name ?? '—'}" by ${v.typeName} (${winnerVotes}/${v.totalVotes})`;
 }
+
+/** Case states before voting has opened — no verdict is reachable from here. */
+const PRE_OPEN_STATES = new Set(['init', 'jury_selection']);
+
+/**
+ * Advisory prepended to await_verdict output when it returns without a verdict
+ * because the case has not opened for voting yet (still forming its jury). Tells
+ * the agent to STOP re-arming await_verdict — which would time out forever — and
+ * check the jury status instead. Returns null once a verdict exists or the case
+ * has already opened (voting genuinely in progress).
+ */
+export function awaitVerdictNotice(result: AwaitResult): string | null {
+  if (result.verdict !== null) return null;
+  if (!PRE_OPEN_STATES.has(result.caseState)) return null;
+  return `The case has not opened for voting yet (state: "${result.caseState}"). `
+    + 'A verdict cannot be reached until its jury fills and the case opens, so await_verdict '
+    + 'will keep timing out — stop re-arming and check the jury status instead.';
+}

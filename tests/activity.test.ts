@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   awaitCaseActivity,
   awaitVerdict,
+  awaitVerdictNotice,
   AwaitCaseActivitySchema,
   verdictHeadline,
 } from '../src/tools/activity.js';
@@ -152,6 +153,21 @@ test('awaitVerdict returns instantly when the case is already terminal', async (
 test('verdictHeadline summarizes a decided verdict', () => {
   const res = { ...page({ verdict: verdictBlock() }), timedOut: false, waitedS: 0 };
   assert.equal(verdictHeadline(res), 'Verdict: "Ship it" by unanimous (1/1)');
+});
+
+test('awaitVerdictNotice flags a case that has not opened yet', () => {
+  const res = { ...page({ caseState: 'jury_selection', verdict: null }), timedOut: true, waitedS: 100 };
+  // The result must carry the case state so an agent can see WHY there is no verdict...
+  assert.equal(res.caseState, 'jury_selection');
+  // ...and a notice must tell it to stop re-arming.
+  const notice = awaitVerdictNotice(res);
+  assert.ok(notice && /not opened/i.test(notice), 'expected a not-opened-yet notice');
+  assert.ok(/jury_selection/.test(notice), 'notice should name the current state');
+});
+
+test('awaitVerdictNotice is silent once a verdict exists', () => {
+  const res = { ...page({ caseState: 'closed', verdict: verdictBlock() }), timedOut: false, waitedS: 0 };
+  assert.equal(awaitVerdictNotice(res), null);
 });
 
 test('AwaitCaseActivitySchema rejects timeoutS above 170', () => {

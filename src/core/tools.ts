@@ -52,6 +52,7 @@ import {
   AwaitVerdictSchema,
   awaitCaseActivity,
   awaitVerdict,
+  awaitVerdictNotice,
   verdictHeadline,
   type AwaitContext,
 } from '../tools/activity.js';
@@ -672,8 +673,10 @@ ${JSON.stringify(createdCase, null, 2)}`,
         const p = AwaitVerdictSchema.parse(params);
         const result = await awaitVerdict(apiClient, p, ctx);
         const headline = verdictHeadline(result);
+        const notice = awaitVerdictNotice(result);
         const body = JSON.stringify(result, null, 2);
-        return { content: [{ type: 'text', text: headline ? `${headline}\n\n${body}` : body }] };
+        const text = [headline, notice, body].filter(Boolean).join('\n\n');
+        return { content: [{ type: 'text', text }] };
       }
 
       case 'tribeunal_mark_evidence': {
