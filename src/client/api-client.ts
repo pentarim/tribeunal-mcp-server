@@ -190,6 +190,7 @@ export class TribeunalAPIClient {
     sides: Array<{ name: string; description?: string }>;
     caseLength?: number;
     maxAiJurorPercentage?: number;
+    jurorCount?: number;
     tags?: string[];
   }) {
     const { caseLength, ...rest } = data;

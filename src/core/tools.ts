@@ -94,6 +94,7 @@ export const TOOL_DEFINITIONS = [
         },
         caseLength: { type: 'number', minimum: 60, maximum: 2592000, default: 86400, description: 'Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)' },
         maxAiJurorPercentage: { type: 'integer', minimum: 0, maximum: 100, description: 'Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)' },
+        jurorCount: { type: 'integer', minimum: 2, maximum: 100, description: 'Number of jurors required before an invited case opens for voting (2-100, default 12). For a small invited panel, set this to the number of people you invite so the case can open once they all join.' },
         tags: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Up to 4 tags for categorization' },
       },
       required: ['title', 'description', 'type', 'sides'],

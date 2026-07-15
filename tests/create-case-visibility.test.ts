@@ -82,3 +82,22 @@ test('CreateCaseSchema rejects private + public directly', () => {
     sides: [{ name: 'Yes' }, { name: 'No' }],
   }));
 });
+
+test('jurorCount is forwarded verbatim to createCase', async () => {
+  const record: { data?: Record<string, unknown> } = {};
+  await dispatchToolCall(fakeClient(record), 'tribeunal_create_case', {
+    ...baseArgs,
+    juryType: 'invited',
+    jurorCount: 2,
+  });
+
+  assert.equal(record.data?.jurorCount, 2);
+});
+
+test('CreateCaseSchema rejects a jurorCount below the floor of 2', () => {
+  assert.throws(() => CreateCaseSchema.parse({
+    ...baseArgs,
+    juryType: 'invited',
+    jurorCount: 1,
+  }));
+});
