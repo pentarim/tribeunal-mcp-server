@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { caseUuid } from './uuid.js';
 
 // Case schemas — the single, canonical vocabulary advertised by the server.
+// Case identifiers are UUIDs only (see ./uuid.ts): a numeric id or slug is
+// rejected here rather than 500-ing backend-side.
 
 export const SearchCasesSchema = z.object({
   query: z.string().optional().describe('Search cases by title or description'),
@@ -12,7 +15,7 @@ export const SearchCasesSchema = z.object({
 });
 
 export const GetCaseSchema = z.object({
-  id: z.string().describe('Case ID or UUID'),
+  id: caseUuid('Case UUID (the case\'s `uuid` field)'),
 });
 
 export const CreateCaseSchema = z.object({
@@ -42,9 +45,9 @@ export const CreateCaseSchema = z.object({
 });
 
 export const ListEvidenceSchema = z.object({
-  caseId: z.string().describe('Case ID to get evidence for'),
+  caseId: caseUuid('Case UUID to get evidence for'),
 });
 
 export const CloseCaseSchema = z.object({
-  caseId: z.string().describe('UUID of the open case to close early (you must be the case owner, or an admin)'),
+  caseId: caseUuid('Case UUID of the open case to close early (you must be the case owner, or an admin)'),
 });

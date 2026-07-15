@@ -75,6 +75,8 @@ function fakeClient(next: (call: number) => CaseActivityPage): TribeunalAPIClien
 
 const noSleep = async (): Promise<void> => {};
 
+const CASE_UUID = '8415a252-5e41-4db6-bd5d-ee5b5ad95dd4';
+
 // ---- tests ----------------------------------------------------------------
 
 test('awaitCaseActivity returns instantly on the first non-empty page', async () => {
@@ -153,7 +155,11 @@ test('verdictHeadline summarizes a decided verdict', () => {
 });
 
 test('AwaitCaseActivitySchema rejects timeoutS above 170', () => {
-  assert.throws(() => AwaitCaseActivitySchema.parse({ caseId: 'x', timeoutS: 171 }));
+  assert.throws(() => AwaitCaseActivitySchema.parse({ caseId: CASE_UUID, timeoutS: 171 }));
+});
+
+test('AwaitCaseActivitySchema rejects a non-UUID caseId', () => {
+  assert.throws(() => AwaitCaseActivitySchema.parse({ caseId: '878', timeoutS: 30 }));
 });
 
 test('dispatchToolCall routes the three activity tools and rejects unknown', async () => {
@@ -161,7 +167,7 @@ test('dispatchToolCall routes the three activity tools and rejects unknown', asy
   const ctx = { sleep: noSleep };
 
   for (const name of ['tribeunal_get_case_activity', 'tribeunal_await_case_activity', 'tribeunal_await_verdict']) {
-    const r = await dispatchToolCall(client, name, { caseId: 'x', after: 'K', timeoutS: 5 }, ctx);
+    const r = await dispatchToolCall(client, name, { caseId: CASE_UUID, after: 'K', timeoutS: 5 }, ctx);
     assert.ok(Array.isArray(r.content) && r.content[0]?.type === 'text');
   }
 

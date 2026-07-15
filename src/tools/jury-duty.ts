@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { caseUuid } from './uuid.js';
 
 // Jury Duty Status & Allowance
 export const JuryDutyStatusSchema = z.object({});
@@ -26,7 +27,7 @@ export const JuryDutyHistorySchema = z.object({
 
 // Jury invitations (case owner)
 export const InviteJurorsSchema = z.object({
-  caseId: z.string().describe('UUID of the case (you must be the case owner, or an admin)'),
+  caseId: caseUuid('Case UUID (you must be the case owner, or an admin)'),
   invitees: z.array(z.string().min(1)).min(1).max(50)
     .describe('Usernames or email addresses to invite to the jury (1-50)'),
 });

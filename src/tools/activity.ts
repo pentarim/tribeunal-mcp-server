@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { caseUuid } from './uuid.js';
 import type { CaseActivityPage, TribeunalAPIClient } from '../client/api-client.js';
 
 // Case-activity feed + agent-await tools.
@@ -21,7 +22,7 @@ const ACTIVITY_TYPES = [
 ] as const;
 
 export const GetCaseActivitySchema = z.object({
-  caseId: z.string().describe('Case ID or UUID whose activity feed to read'),
+  caseId: caseUuid('Case UUID whose activity feed to read'),
   after: z
     .string()
     .optional()
@@ -34,7 +35,7 @@ export const GetCaseActivitySchema = z.object({
 });
 
 export const AwaitCaseActivitySchema = z.object({
-  caseId: z.string().describe('Case ID or UUID to watch'),
+  caseId: caseUuid('Case UUID to watch'),
   after: z
     .string()
     .optional()
@@ -53,7 +54,7 @@ export const AwaitCaseActivitySchema = z.object({
 });
 
 export const AwaitVerdictSchema = z.object({
-  caseId: z.string().describe('Case ID or UUID whose verdict to await'),
+  caseId: caseUuid('Case UUID whose verdict to await'),
   timeoutS: z
     .number()
     .int()

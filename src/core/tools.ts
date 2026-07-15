@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TribeunalAPIClient, TribeunalAPIError } from '../client/api-client.js';
+import { UUID_PATTERN, caseWithUuidOnly } from '../tools/uuid.js';
 
 // Case schemas
 import {
@@ -123,7 +124,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Case ID or UUID' },
+        id: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID (the case uuid, not the numeric id)' },
       },
       required: ['id'],
     },
@@ -137,7 +138,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'UUID of the open case to close early (owner or admin only)' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID of the open case to close early (owner or admin only)' },
       },
       required: ['caseId'],
     },
@@ -150,7 +151,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID to get evidence for' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID to get evidence for' },
       },
       required: ['caseId'],
     },
@@ -164,8 +165,8 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID to vote on' },
-        sideId: { type: 'string', description: 'Side/option ID to vote for' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID to vote on' },
+        sideId: { type: 'string', pattern: UUID_PATTERN, description: 'Side UUID to vote for (a side uuid from get_case)' },
         comment: { type: 'string', maxLength: 2000, description: 'Optional short rationale, stored as a vote-linked comment (markable as evidence by the owner/jury)' },
       },
       required: ['caseId', 'sideId'],
@@ -179,8 +180,8 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID' },
-        sideId: { type: 'string', description: "Side UUID whose vote to revoke (the API resolves the caller's vote by user+case)" },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID' },
+        sideId: { type: 'string', pattern: UUID_PATTERN, description: "Side UUID whose vote to revoke (the API resolves the caller's vote by user+case)" },
       },
       required: ['caseId', 'sideId'],
     },
@@ -193,7 +194,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID to get voting statistics for' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID to get voting statistics for' },
       },
       required: ['caseId'],
     },
@@ -207,7 +208,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID to comment on' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID to comment on' },
         text: { type: 'string', minLength: 1, maxLength: 5000, description: 'Comment text (1-5000 chars)' },
       },
       required: ['caseId', 'text'],
@@ -221,7 +222,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID to list comments for' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID to list comments for' },
       },
       required: ['caseId'],
     },
@@ -264,7 +265,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         evidenceId: { type: 'string', description: 'Case-file evidence ID to rate' },
         rating: { type: 'integer', enum: [-1, 0, 1], description: 'Rating: 1 (up), 0 (irrelevant), or -1 (down)' },
-        sideId: { type: 'string', description: 'Optional side UUID this rating relates to' },
+        sideId: { type: 'string', pattern: UUID_PATTERN, description: 'Optional side UUID this rating relates to' },
       },
       required: ['evidenceId', 'rating'],
     },
@@ -279,7 +280,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID or UUID whose activity to read' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID whose activity to read' },
         after: { type: 'string', description: 'Opaque cursor from a previous response; omit for the tail (latest events)' },
         types: { type: 'array', items: { type: 'string', enum: ['vote', 'vote_revoked', 'comment', 'evidence_marked', 'evidence_unmarked', 'jury_joined', 'trial_closed'] }, description: 'Restrict to these event types' },
         limit: { type: 'number', minimum: 1, maximum: 100, default: 50, description: 'Max events (1-100, default 50)' },
@@ -296,7 +297,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID or UUID to watch' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID to watch' },
         after: { type: 'string', description: 'Cursor to watch from; omit to anchor at the current tail ("watch from now")' },
         types: { type: 'array', items: { type: 'string', enum: ['vote', 'vote_revoked', 'comment', 'evidence_marked', 'evidence_unmarked', 'jury_joined', 'trial_closed'] }, description: 'Only wake for these event types' },
         timeoutS: { type: 'integer', minimum: 5, maximum: 170, default: 120, description: 'Seconds to block (5-170). On timeout, re-arm with the returned latestCursor.' },
@@ -313,7 +314,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'Case ID or UUID whose verdict to await' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID whose verdict to await' },
         timeoutS: { type: 'integer', minimum: 5, maximum: 170, default: 150, description: 'Seconds to block (5-170); instant if already terminal' },
       },
       required: ['caseId'],
@@ -512,7 +513,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        caseId: { type: 'string', description: 'UUID of the case (owner or admin only)' },
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID (owner or admin only)' },
         invitees: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 1, maxItems: 50,
                     description: 'Usernames or email addresses to invite (1-50)' },
       },
@@ -553,7 +554,9 @@ export async function dispatchToolCall(
           params.juryType = 'invited';
         }
         const p = CreateCaseSchema.parse(params);
-        const createdCase = await apiClient.createCase(p);
+        // UUID-only outward contract: drop the numeric `id` so the agent reuses
+        // the `uuid` on follow-up calls (a numeric id would 500 backend-side).
+        const createdCase = caseWithUuidOnly(await apiClient.createCase(p));
         const url = createdCase.url || `https://tribeunal.test/cases/${createdCase.slug}`;
         return {
           content: [
@@ -575,13 +578,13 @@ ${JSON.stringify(createdCase, null, 2)}`,
 
       case 'tribeunal_search_cases': {
         const p = SearchCasesSchema.parse(params);
-        const results = await apiClient.searchCases(p);
+        const results = caseWithUuidOnly(await apiClient.searchCases(p));
         return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
       }
 
       case 'tribeunal_get_case': {
         const p = GetCaseSchema.parse(params);
-        const found = await apiClient.getCase(p.id);
+        const found = caseWithUuidOnly(await apiClient.getCase(p.id));
         return { content: [{ type: 'text', text: JSON.stringify(found, null, 2) }] };
       }
 
