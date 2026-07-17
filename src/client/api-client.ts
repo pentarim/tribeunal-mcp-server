@@ -191,11 +191,14 @@ export class TribeunalAPIClient {
     caseLength?: number;
     maxAiJurorPercentage?: number;
     jurorCount?: number;
+    openImmediately?: boolean;
     tags?: string[];
   }) {
     const { caseLength, ...rest } = data;
     // The backend's create contract still names the duration `trialLength`; this
-    // is the single internal mapping from the user-facing `caseLength`.
+    // is the single internal mapping from the user-facing `caseLength`. Every other
+    // field (openImmediately included) forwards verbatim; omitting openImmediately
+    // lets the backend default it to true.
     const body = caseLength === undefined ? rest : { ...rest, trialLength: caseLength };
     const response = await this.client.post('/cases', body);
     return response.data;

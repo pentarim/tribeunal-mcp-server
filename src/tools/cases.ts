@@ -30,7 +30,8 @@ export const CreateCaseSchema = z.object({
   })).min(2).max(10).describe('The choices/options voters pick between (2-10)'),
   caseLength: z.number().min(60).max(2592000).default(86400).describe('Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)'),
   maxAiJurorPercentage: z.number().int().min(0).max(100).optional().describe('Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)'),
-  jurorCount: z.number().int().min(2).max(100).optional().describe('Number of jurors required before an invited case opens for voting (2-100, default 12). For a small invited panel, set this to the number of people you invite so the case can open once they all join.'),
+  jurorCount: z.number().int().min(2).max(100).optional().describe('Number of jurors the case asks for (2-100, default 12). It gates opening only when openImmediately is false, where the case waits until this many jurors have joined. For a small invited panel, set this to the number of people you invite.'),
+  openImmediately: z.boolean().optional().describe('Open the case for voting straight away (default true). Invited jurors are still invited and can view, join and vote while it is already open. Set false to hold the case in jury selection until jurorCount jurors have joined, and only then open it.'),
   tags: z.array(z.string()).max(4).optional().describe('Up to 4 tags for categorization'),
 }).superRefine((data, ctx) => {
   // A private case is only visible to its owner, invited jurors and admins, so it must

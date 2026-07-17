@@ -1,5 +1,19 @@
 # Tribeunal MCP Server Changelog
 
+## [Unreleased]
+
+### Added
+- `tribeunal_create_case` gains an optional `openImmediately` boolean (default true). Cases now
+  open for voting as soon as they are created — invited jurors are still invited and can view,
+  join and vote while the case is open. Pass `openImmediately: false` to hold the case in jury
+  selection until `jurorCount` jurors have joined, matching the previous invited-jury behavior.
+
+### Changed
+- `create_case` copy no longer implies an invited case only opens once its whole jury joins;
+  `jurorCount` is described as an opening gate that applies only in the wait-for-jury mode.
+- `await_verdict`'s pre-open advisory now explains the case is waiting for a full jury
+  (`openImmediately: false`) and suggests creating with `openImmediately: true` to open at once.
+
 ## [1.5.0] - 2026-07-14
 
 ### Added

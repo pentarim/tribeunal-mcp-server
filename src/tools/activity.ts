@@ -195,6 +195,8 @@ export function awaitVerdictNotice(result: AwaitResult): string | null {
   if (result.verdict !== null) return null;
   if (!PRE_OPEN_STATES.has(result.caseState)) return null;
   return `The case has not opened for voting yet (state: "${result.caseState}"). `
-    + 'A verdict cannot be reached until its jury fills and the case opens, so await_verdict '
-    + 'will keep timing out — stop re-arming and check the jury status instead.';
+    + 'It was created to wait for a full jury (openImmediately: false), so a verdict cannot be '
+    + 'reached until jurorCount jurors have joined and the case opens. await_verdict will keep '
+    + 'timing out — stop re-arming and either fill the jury or, for a new case, create it with '
+    + 'openImmediately: true so it opens for voting straight away.';
 }

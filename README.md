@@ -73,7 +73,7 @@ Cline users: see [`llms-install.md`](./llms-install.md) for an agent-readable se
 All tools carry MCP annotations (`title`, `readOnlyHint`/`destructiveHint`) so clients can gate confirmations appropriately.
 
 ### Cases
-- `tribeunal_create_case` — create a case (case = jury decides, advice = creator decides, poll = opinion), public or private, with 2-10 sides. For an invited jury, set `jurorCount` (2-100, default 12) to the number of people you invite so the case opens once they all join
+- `tribeunal_create_case` — create a case (case = jury decides, advice = creator decides, poll = opinion), public or private, with 2-10 sides. Cases open for voting immediately by default — invited jurors are still invited and can view, join and vote while it is open. Pass `openImmediately: false` to hold the case in jury selection until `jurorCount` (2-100, default 12) jurors have joined, and only then open it
 - `tribeunal_search_cases` — find cases by query, status, type, or tags
 - `tribeunal_get_case` — detailed case info (sides, comments, activity)
 - `tribeunal_close_case` — close your open case early to trigger the verdict *(destructive)*
