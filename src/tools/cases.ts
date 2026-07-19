@@ -32,6 +32,7 @@ export const CreateCaseSchema = z.object({
   maxAiJurorPercentage: z.number().int().min(0).max(100).optional().describe('Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)'),
   jurorCount: z.number().int().min(2).max(100).optional().describe('Number of jurors the case asks for (2-100, default 12). It gates opening only when openImmediately is false, where the case waits until this many jurors have joined. For a small invited panel, set this to the number of people you invite.'),
   openImmediately: z.boolean().optional().describe('Open the case for voting straight away (default true). Invited jurors are still invited and can view, join and vote while it is already open. Set false to hold the case in jury selection until jurorCount jurors have joined, and only then open it.'),
+  allowsGuestVotes: z.boolean().optional().describe('Let visitors without a Tribeunal account vote on this case (default false). Guest votes count in full — they enter the tallies, percentages and the verdict exactly like a registered juror\'s. Only valid on a public case with a public jury. Guests are deduplicated per browser, so a returning visitor changes their vote rather than adding one, but someone determined can still vote again from another browser — enable it where reach matters more than strict one-person-one-vote.'),
   tags: z.array(z.string()).max(4).optional().describe('Up to 4 tags for categorization'),
 }).superRefine((data, ctx) => {
   // A private case is only visible to its owner, invited jurors and admins, so it must
@@ -42,6 +43,18 @@ export const CreateCaseSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['juryType'],
       message: 'A private case must use an invited jury (set juryType to "invited").',
+    });
+  }
+
+  // Anonymous voting needs a case anyone can read AND a jury anyone can join. Caught
+  // here so the caller gets a named parameter and a reason instead of a bare 400 from
+  // the backend, which enforces the same rule in an entity constraint and a DB CHECK.
+  if (data.allowsGuestVotes === true
+    && (data.visibility !== 'public' || data.juryType !== 'public')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['allowsGuestVotes'],
+      message: 'Anonymous voting requires a public case with a public jury.',
     });
   }
 });

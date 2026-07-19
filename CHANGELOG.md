@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- `tribeunal_create_case` gains an optional `allowsGuestVotes` boolean (default false). When
+  enabled, visitors with no Tribeunal account can vote on the case and their votes count in
+  full — they enter the tallies, percentages and the verdict exactly like a registered juror's.
+  Only valid on a public case with a public jury; combining it with private visibility or an
+  invited jury is rejected before the request leaves the client. Guests are deduplicated per
+  browser (a returning visitor changes their vote rather than adding one), but voting again
+  from another browser stays possible, so enable it where reach matters more than strict
+  one-person-one-vote.
 - `tribeunal_create_case` gains an optional `openImmediately` boolean (default true). Cases now
   open for voting as soon as they are created — invited jurors are still invited and can view,
   join and vote while the case is open. Pass `openImmediately: false` to hold the case in jury
