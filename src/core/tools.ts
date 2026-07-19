@@ -512,7 +512,7 @@ export const TOOL_DEFINITIONS = [
     title: 'Invite jurors',
     annotations: { title: 'Invite jurors', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description:
-      'Invite users to the jury of a case you own (owner or admin only). The case must have juryType "invited" (e.g. created via tribeunal_create_case with juryType "invited" or visibility "private"). Accepts usernames or email addresses; each invitee is processed independently — the response reports invited / duplicate / not_found per entry.',
+      'Invite users to the jury of a case you own (owner or admin only). Works on any case regardless of jury type — an invitation is recruitment, not restriction: on a public-jury case it notifies the invitee and its accept link seats them as a normal juror, and it never restricts the open participation a public case already grants everyone. Accepts usernames or email addresses; each invitee is processed independently — the response reports invited / duplicate / not_found per entry.',
     inputSchema: {
       type: 'object',
       properties: {
