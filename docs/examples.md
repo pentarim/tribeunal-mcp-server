@@ -199,6 +199,19 @@ const priv = await client.callTool('tribeunal_create_case', {
   sides: [{ name: 'Vendor A' }, { name: 'Vendor B' }],
 });
 
+// A link-poll: private + allowsGuestVotes. The case stays out of every listing, search
+// result and feed, but anyone you send the link to can read it and vote — no account
+// needed. It runs a public jury (an omitted juryType is set to 'public' here, not
+// 'invited'), because guests hold no seat on an invited panel.
+const linkPoll = await client.callTool('tribeunal_create_case', {
+  title: 'Which venue for the offsite?',
+  description: 'Sending this round the team chat — vote without signing up.',
+  type: 'poll',
+  visibility: 'private',
+  allowsGuestVotes: true,
+  sides: [{ name: 'Lisbon' }, { name: 'Tallinn' }],
+});
+
 // 2. Block until the case reaches a verdict (returns instantly if already terminal).
 //    On the worker transport this streams notifications/progress every 5s.
 const result = await client.callTool('tribeunal_await_verdict', { caseId, timeoutS: 150 });

@@ -64,6 +64,38 @@ test('explicit private + public jury is rejected before reaching the client', as
   assert.equal(record.data, undefined);
 });
 
+// The link-poll: a private case that allows anonymous voting is unlisted but votable by
+// anyone holding its link, so it takes a public jury rather than an invited panel.
+test('private + allowsGuestVotes + public jury is forwarded as a link-poll', async () => {
+  const record: { data?: Record<string, unknown> } = {};
+  await dispatchToolCall(fakeClient(record), 'tribeunal_create_case', {
+    ...baseArgs,
+    visibility: 'private',
+    juryType: 'public',
+    allowsGuestVotes: true,
+  });
+
+  assert.equal(record.data?.visibility, 'private');
+  assert.equal(record.data?.juryType, 'public');
+  assert.equal(record.data?.allowsGuestVotes, true);
+});
+
+test('private + allowsGuestVotes without a juryType coerces to public, not invited', async () => {
+  const record: { data?: Record<string, unknown> } = {};
+  await dispatchToolCall(fakeClient(record), 'tribeunal_create_case', {
+    ...baseArgs,
+    visibility: 'private',
+    allowsGuestVotes: true,
+  });
+
+  assert.equal(record.data?.visibility, 'private');
+  assert.equal(
+    record.data?.juryType,
+    'public',
+    'coercing this one to invited would make the case unbuildable — guests hold no seat on a panel',
+  );
+});
+
 test('omitting visibility defaults the body to public', async () => {
   const record: { data?: Record<string, unknown> } = {};
   await dispatchToolCall(fakeClient(record), 'tribeunal_create_case', { ...baseArgs });
@@ -79,6 +111,18 @@ test('CreateCaseSchema rejects private + public directly', () => {
     type: 'case',
     visibility: 'private',
     juryType: 'public',
+    sides: [{ name: 'Yes' }, { name: 'No' }],
+  }));
+});
+
+test('CreateCaseSchema accepts private + public when anonymous voting is on', () => {
+  assert.doesNotThrow(() => CreateCaseSchema.parse({
+    title: 'A private matter to decide',
+    description: 'Context long enough to pass validation.',
+    type: 'case',
+    visibility: 'private',
+    juryType: 'public',
+    allowsGuestVotes: true,
     sides: [{ name: 'Yes' }, { name: 'No' }],
   }));
 });

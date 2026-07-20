@@ -77,6 +77,18 @@ test('a non-boolean allowsGuestVotes never reaches the client', async () => {
   assert.equal(record.data, undefined);
 });
 
+test('allowsGuestVotes is rejected on an invited jury, whatever the visibility', () => {
+  // A guest holds no seat on a closed panel. This is the half of the old rule that
+  // survives — the public-visibility half is gone, since a private case may opt in.
+  for (const visibility of ['public', 'private']) {
+    assert.throws(
+      () => CreateCaseSchema.parse({ ...baseArgs, visibility, juryType: 'invited', allowsGuestVotes: true }),
+      undefined,
+      `${visibility} + invited jury must still refuse anonymous voting`,
+    );
+  }
+});
+
 test('the hand-written tool definition advertises allowsGuestVotes as a boolean', () => {
   // The zod schema and TOOL_DEFINITIONS are maintained separately, so a param added to
   // one and forgotten in the other is invisible to callers reading the tool list.

@@ -70,7 +70,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_create_case',
     title: 'Create case',
     annotations: { title: 'Create case', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first. Set visibility to "private" to keep a case visible only to you, your invited jurors and admins (a private case runs an invited jury).',
+    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first. Set visibility to "private" to keep a case visible only to you, your invited jurors and admins (a private case runs an invited jury). Add allowsGuestVotes to a private case to make a link-poll instead: unlisted everywhere, but readable and votable by anyone you send the link to.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,7 +78,7 @@ export const TOOL_DEFINITIONS = [
         description: { type: 'string', minLength: 10, description: 'Context, background, and criteria for the case' },
         type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'Case type — case (binding jury decision), advice (input for the creator), or poll (opinion gathering)' },
         juryType: { type: 'string', enum: ['public', 'invited'], default: 'public', description: 'Who can participate — public (anyone) or invited only' },
-        visibility: { type: 'string', enum: ['public', 'private'], default: 'public', description: 'Case visibility — public (anyone can find and read it) or private (only you, your invited jurors and admins). A private case must use an invited jury; omit juryType and it is set to invited automatically.' },
+        visibility: { type: 'string', enum: ['public', 'private'], default: 'public', description: 'Case visibility — public (anyone can find and read it) or private (only you, your invited jurors and admins). A private case must use an invited jury; omit juryType and it is set to invited automatically. One exception: set allowsGuestVotes on a private case and it becomes a link-poll — still absent from every listing, search and feed, but readable and votable by anyone you send the link to — which takes a public jury instead.' },
         sides: {
           type: 'array',
           items: {
@@ -97,7 +97,7 @@ export const TOOL_DEFINITIONS = [
         maxAiJurorPercentage: { type: 'integer', minimum: 0, maximum: 100, description: 'Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)' },
         jurorCount: { type: 'integer', minimum: 2, maximum: 100, description: 'Number of jurors the case asks for (2-100, default 12). It gates opening only when openImmediately is false, where the case waits until this many jurors have joined. For a small invited panel, set this to the number of people you invite.' },
         openImmediately: { type: 'boolean', description: 'Open the case for voting straight away (default true). Invited jurors are still invited and can view, join and vote while it is already open. Set false to hold the case in jury selection until jurorCount jurors have joined, and only then open it.' },
-        allowsGuestVotes: { type: 'boolean', description: 'Let visitors without a Tribeunal account vote on this case (default false). Guest votes count in full — they enter the tallies, percentages and the verdict exactly like a registered juror\'s. Only valid on a public case with a public jury. Guests are deduplicated per browser, so a returning visitor changes their vote rather than adding one, but someone determined can still vote again from another browser — enable it where reach matters more than strict one-person-one-vote.' },
+        allowsGuestVotes: { type: 'boolean', description: 'Let visitors without a Tribeunal account vote on this case (default false). Guest votes count in full — they enter the tallies, percentages and the verdict exactly like a registered juror\'s. Requires a public jury; visibility may be either, and pairing it with visibility "private" makes a link-poll: unlisted everywhere, but votable by whoever holds the link. Guests are deduplicated per browser, so a returning visitor changes their vote rather than adding one, but someone determined can still vote again from another browser — enable it where reach matters more than strict one-person-one-vote.' },
         tags: { type: 'array', items: { type: 'string' }, maxItems: 4, description: 'Up to 4 tags for categorization' },
       },
       required: ['title', 'description', 'type', 'sides'],
@@ -551,11 +551,12 @@ export async function dispatchToolCall(
     switch (toolName) {
       // Case tools
       case 'tribeunal_create_case': {
-        // A private case must run an invited jury. When the caller asked for private
-        // without naming a juryType, coerce it to 'invited' BEFORE zod's .default('public')
-        // would otherwise force a rejecting public/private conflict.
+        // A private case must run an invited jury, so an omitted juryType is coerced here
+        // BEFORE zod's .default('public') would force a rejecting public/private conflict.
+        // A private case that allows anonymous voting is the exception — it is a link-poll
+        // and needs the public jury its link holders vote on, so leave that one alone.
         if (params.visibility === 'private' && params.juryType === undefined) {
-          params.juryType = 'invited';
+          params.juryType = params.allowsGuestVotes === true ? 'public' : 'invited';
         }
         const p = CreateCaseSchema.parse(params);
         // UUID-only outward contract: drop the numeric `id` so the agent reuses
