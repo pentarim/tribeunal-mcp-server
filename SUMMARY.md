@@ -34,14 +34,15 @@ mcp-server/
 
 ## Features Implemented
 
-### Core MCP Tools (32 total)
+### Core MCP Tools (33 total)
 
-#### Case Management (5 tools)
+#### Case Management (6 tools)
 - **`tribeunal_search_cases`** - Search cases with filters (status, type, tags)
 - **`tribeunal_get_case`** - Get detailed case information (sides, comments, activity)
 - **`tribeunal_create_case`** - Create new cases with full configuration
 - **`tribeunal_close_case`** - Close one of your open cases early (owner/admin) to trigger the verdict
 - **`tribeunal_list_evidence`** - List marked evidence (comments + case files)
+- **`tribeunal_set_side_image`** - Set or replace the image on a case side's vote card (owner-only)
 
 #### Voting System (3 tools)
 - **`tribeunal_cast_vote`** - Vote on cases, optionally with a comment (shown in the activity feed)

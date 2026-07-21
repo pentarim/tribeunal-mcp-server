@@ -24,6 +24,9 @@ export class TribeunalAPIError extends Error {
 export function extractApiErrorMessage(data: unknown, fallback: string): string {
   if (data && typeof data === 'object') {
     const d = data as Record<string, any>;
+    if (typeof d.reason === 'string' && d.reason.trim()) {
+      return typeof d.message === 'string' && d.message.trim() ? `${d.reason}: ${d.message}` : d.reason;
+    }
     if (typeof d.detail === 'string' && d.detail.trim()) return d.detail;
     if (typeof d['hydra:description'] === 'string' && d['hydra:description'].trim()) return d['hydra:description'];
     if (Array.isArray(d.violations) && d.violations.length) {
@@ -187,7 +190,7 @@ export class TribeunalAPIClient {
     type: 'case' | 'advice' | 'poll';
     juryType: 'public' | 'invited';
     visibility?: 'public' | 'private';
-    sides: Array<{ name: string; description?: string }>;
+    sides: Array<{ name: string; description?: string; image?: string }>;
     caseLength?: number;
     maxAiJurorPercentage?: number;
     jurorCount?: number;
@@ -200,7 +203,9 @@ export class TribeunalAPIClient {
     // is the single internal mapping from the user-facing `caseLength`. Every other
     // field (openImmediately and allowsGuestVotes included) forwards verbatim;
     // omitting either lets the backend default it — true and false respectively.
-    const body = caseLength === undefined ? rest : { ...rest, trialLength: caseLength };
+    // Each side's `image` maps to the backend's `imageUrl` field the same way.
+    const sides = rest.sides.map(({ image, ...side }) => (image === undefined ? side : { ...side, imageUrl: image }));
+    const body = caseLength === undefined ? { ...rest, sides } : { ...rest, sides, trialLength: caseLength };
     const response = await this.client.post('/cases', body);
     return response.data;
   }
@@ -210,6 +215,13 @@ export class TribeunalAPIClient {
     // baseURL like createCase, not baseOrigin). No request body. Owner/admin only,
     // open cases only; the verdict is determined asynchronously by the backend pipeline.
     const response = await this.client.post(`/cases/${caseId}/close`);
+    return response.data;
+  }
+
+  async setSideImage(sideId: string, imageUrl: string) {
+    // POST /api/sides/{uuid}/image {url} — owner-only, uuid-only. Uses the /api baseURL
+    // like createCase. A 422 carries {reason, message}; the response interceptor surfaces it.
+    const response = await this.client.post(`/sides/${sideId}/image`, { url: imageUrl });
     return response.data;
   }
 

@@ -45,6 +45,8 @@ import {
   InviteJurorsSchema,
 } from '../tools/jury-duty.js';
 
+import { SetSideImageSchema } from '../tools/sides.js';
+
 // Activity feed + agent-await schemas and loops
 import {
   GetCaseActivitySchema,
@@ -86,6 +88,7 @@ export const TOOL_DEFINITIONS = [
             properties: {
               name: { type: 'string', description: 'Option/choice name' },
               description: { type: 'string', description: 'Optional description for this choice' },
+              image: { type: 'string', format: 'uri', description: 'Optional https image URL for this choice — fetched and re-encoded server-side (png/jpeg/webp, <= 5 MB). Shown on the choice\'s vote card.' },
             },
             required: ['name'],
           },
@@ -145,6 +148,21 @@ export const TOOL_DEFINITIONS = [
         caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID of the open case to close early (owner or admin only)' },
       },
       required: ['caseId'],
+    },
+  },
+  {
+    name: 'tribeunal_set_side_image',
+    title: 'Set side image',
+    annotations: { title: 'Set side image', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    description: 'Set or replace the image shown on a case side\'s vote card, fetched from a public https URL. Owner-only. The image is downloaded and re-encoded server-side (png/jpeg/webp, <= 5 MB); http URLs, private/internal hosts and non-images are rejected. Use the case\'s and side\'s `uuid` fields (from tribeunal_get_case), not numeric ids.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID the side belongs to (the case\'s uuid field)' },
+        sideId: { type: 'string', pattern: UUID_PATTERN, description: 'Side UUID to set the image on (the side\'s uuid field)' },
+        imageUrl: { type: 'string', format: 'uri', description: 'Public https URL of the image (png/jpeg/webp, <= 5 MB)' },
+      },
+      required: ['caseId', 'sideId', 'imageUrl'],
     },
   },
   {
@@ -604,6 +622,20 @@ ${JSON.stringify(createdCase, null, 2)}`,
             },
           ],
         };
+      }
+
+      case 'tribeunal_set_side_image': {
+        const p = SetSideImageSchema.parse(params);
+        // Confirm the side belongs to the named case so the caller gets a clear message
+        // instead of a bare 404 when they mix up ids.
+        const parentCase = await apiClient.getCase(p.caseId);
+        const sides = Array.isArray((parentCase as any)?.sides) ? (parentCase as any).sides : [];
+        const match = sides.find((s: any) => s?.uuid === p.sideId);
+        if (!match) {
+          return { content: [{ type: 'text', text: `Side ${p.sideId} is not part of case ${p.caseId}. Use tribeunal_get_case to find the correct side uuid.` }] };
+        }
+        const updated = caseWithUuidOnly(await apiClient.setSideImage(p.sideId, p.imageUrl));
+        return { content: [{ type: 'text', text: `Side image set successfully.\n\n${JSON.stringify(updated, null, 2)}` }] };
       }
 
       case 'tribeunal_list_evidence': {

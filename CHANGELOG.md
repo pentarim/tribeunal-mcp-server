@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- `tribeunal_create_case` sides now accept an optional `image` https URL per side (33 tools
+  total). The image is fetched and re-encoded server-side (png/jpeg/webp, <= 5 MB; http URLs,
+  private/internal hosts and non-images are rejected) and shown on the choice's vote card.
+  `TribeunalAPIClient.createCase` maps each side's `image` to the backend's `imageUrl` field.
+- `tribeunal_set_side_image` — set or replace the image on an existing case side (owner-only).
+  Confirms the side belongs to the named case first (via `tribeunal_get_case`) so a mismatched
+  id gets a clear message instead of a bare 404, then calls the new
+  `POST /api/sides/{uuid}/image` endpoint. A 422 failure now surfaces its machine-readable
+  `reason` (e.g. `blocked_host`, `too_large`, `bad_type`) verbatim via
+  `extractApiErrorMessage`, ahead of the generic `detail` fallback.
 - `tribeunal_create_case` gains an optional `allowsGuestVotes` boolean (default false). When
   enabled, visitors with no Tribeunal account can vote on the case and their votes count in
   full — they enter the tallies, percentages and the verdict exactly like a registered juror's.

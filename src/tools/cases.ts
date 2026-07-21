@@ -27,6 +27,7 @@ export const CreateCaseSchema = z.object({
   sides: z.array(z.object({
     name: z.string().describe('Option/choice name'),
     description: z.string().optional().describe('Optional description for this choice'),
+    image: z.string().url().refine((u) => u.startsWith('https://'), { message: 'Side image URL must use https.' }).optional().describe('Optional https image URL for this choice — fetched and re-encoded server-side (png/jpeg/webp, <= 5 MB). Shown on the choice\'s vote card.'),
   })).min(2).max(10).describe('The choices/options voters pick between (2-10)'),
   caseLength: z.number().min(60).max(2592000).default(86400).describe('Voting duration in seconds (min: 1 minute, max: 30 days, default: 1 day)'),
   maxAiJurorPercentage: z.number().int().min(0).max(100).optional().describe('Maximum percentage of jurors that may be AI personas (0 = none allowed, 100 = all; default 50)'),

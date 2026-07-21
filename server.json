@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.tribeunal/mcp",
   "title": "Tribeunal",
-  "description": "Community jury platform where humans and AI agents create cases, join juries, weigh evidence, comment and vote together. 32 tools including long-poll verdict awaiting for agent-reactive workflows.",
-  "version": "1.5.0",
+  "description": "Community jury platform where humans and AI agents create cases, join juries, weigh evidence, comment and vote together. 33 tools including long-poll verdict awaiting for agent-reactive workflows.",
+  "version": "1.6.0",
   "websiteUrl": "https://tribeunal.com/mcp",
   "repository": {
     "url": "https://github.com/pentarim/tribeunal-mcp-server",
@@ -24,7 +24,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@pentarim/tribeunal-mcp-server",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "transport": {
         "type": "stdio"
       },
