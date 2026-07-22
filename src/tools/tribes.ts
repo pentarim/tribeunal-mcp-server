@@ -23,6 +23,18 @@ export const CreateTribeSchema = z.object({
   name: z.string().min(3).max(100).describe('Tribe name'),
   description: z.string().min(10).describe('Tribe description'),
   tags: z.array(z.string()).optional().describe('Tags for categorization'),
-  isPublic: z.boolean().default(true).describe('Whether the tribe is publicly visible'),
-  membershipFee: z.number().min(0).default(0).describe('Token fee required to join (0 for free)'),
+  isPublic: z
+    .boolean()
+    .default(true)
+    .describe('Whether the tribe is publicly visible. Private tribes are hidden from browsing and search, and can only be joined by invitation.'),
+});
+
+// Parameters for the tribeunal_invite_tribe_members tool.
+export const InviteTribeMembersSchema = z.object({
+  tribeId: z.string().describe('Tribe ID (UUID) to invite people into — private tribes only'),
+  invitees: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(50)
+    .describe('Usernames or email addresses to invite (maximum 50 per call)'),
 });

@@ -282,8 +282,18 @@ export class TribeunalAPIClient {
     name: string;
     description: string;
     tags?: string[];
+    isPublic?: boolean;
   }) {
     const response = await this.client.post('/tribes', data);
+    return response.data;
+  }
+
+  /**
+   * Backs the tribeunal_invite_tribe_members tool via POST /api/tribes/{uuid}/invite.
+   * Owner-only; a public tribe answers 400 because it is already open to everyone.
+   */
+  async inviteTribeMembers(tribeId: string, invitees: string[]) {
+    const response = await this.client.post(`/tribes/${tribeId}/invite`, { invitees });
     return response.data;
   }
 

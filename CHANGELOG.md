@@ -3,6 +3,23 @@
 ## [Unreleased]
 
 ### Added
+- `tribeunal_invite_tribe_members` — invite people into a PRIVATE tribe you own, by username
+  or email (max 50 per call). Each invitee may then view and join the tribe. Public tribes are
+  already open to everyone, so inviting into one returns 400 `tribe_not_private`.
+
+### Fixed
+- `tribeunal_create_tribe` silently dropped `isPublic`: the tool advertised it, but neither the
+  dispatcher nor the API client forwarded it, so every tribe was created public regardless of
+  what the caller asked for. It is now forwarded, and private tribes are genuinely hidden and
+  invitation-only.
+
+### Removed
+- `membershipFee` from `tribeunal_create_tribe`, and the "requires tokens" / "may require
+  tokens for membership fee" wording from the tribe tool descriptions. None of it had any
+  backing implementation anywhere in the platform — the parameter was accepted and discarded,
+  and the descriptions promised a token economy that does not exist. `tribeunal_join_tribe`
+  now documents the rule that does apply: private tribes are invitation-only, and joining one
+  without an invitation returns 404.
 - `tribeunal_create_case` sides now accept an optional `image` https URL per side (33 tools
   total). The image is fetched and re-encoded server-side (png/jpeg/webp, <= 5 MB; http URLs,
   private/internal hosts and non-images are rejected) and shown on the choice's vote card.

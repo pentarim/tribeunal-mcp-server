@@ -32,6 +32,7 @@ import {
   JoinTribeSchema,
   LeaveTribeSchema,
   CreateTribeSchema,
+  InviteTribeMembersSchema,
 } from '../tools/tribes.js';
 
 import {
@@ -347,7 +348,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_list_tribes',
     title: 'List tribes',
     annotations: { title: 'List tribes', readOnlyHint: true, openWorldHint: false },
-    description: 'Browse available tribes on Tribeunal',
+    description: 'Browse available tribes on Tribeunal. Private tribes appear only to their owner and members.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -361,7 +362,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_get_tribe',
     title: 'Get tribe',
     annotations: { title: 'Get tribe', readOnlyHint: true, openWorldHint: false },
-    description: 'Get detailed information about a specific tribe including members and rank structure',
+    description: 'Get detailed information about a specific tribe including members and rank structure. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; otherwise it returns 404.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -374,7 +375,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_join_tribe',
     title: 'Join tribe',
     annotations: { title: 'Join tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Join a tribe (may require tokens for membership fee)',
+    description: 'Join a tribe. Private tribes are invitation-only: joining one without a pending invitation returns 404, the same answer as a tribe that does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -400,17 +401,36 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_create_tribe',
     title: 'Create tribe',
     annotations: { title: 'Create tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Create a new interest-based tribe (requires tokens)',
+    description: 'Create a new interest-based tribe. Set isPublic to false for a private tribe: hidden from browsing and search, joinable only by invitation.',
     inputSchema: {
       type: 'object',
       properties: {
         name: { type: 'string', minLength: 3, maxLength: 100, description: 'Tribe name' },
         description: { type: 'string', minLength: 10, description: 'Tribe description' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tags for categorization' },
-        isPublic: { type: 'boolean', default: true, description: 'Whether the tribe is publicly visible' },
-        membershipFee: { type: 'number', minimum: 0, default: 0, description: 'Token fee required to join' },
+        isPublic: { type: 'boolean', default: true, description: 'Whether the tribe is publicly visible. False creates a private, invitation-only tribe.' },
       },
       required: ['name', 'description'],
+    },
+  },
+  {
+    name: 'tribeunal_invite_tribe_members',
+    title: 'Invite tribe members',
+    annotations: { title: 'Invite tribe members', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: 'Invite people into a PRIVATE tribe you own, by username or email. Public tribes are already open to everyone, so inviting into one returns 400. Each invitee may then view and join the tribe.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tribeId: { type: 'string', description: 'Tribe ID (UUID) to invite people into — private tribes only' },
+        invitees: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 1,
+          maxItems: 50,
+          description: 'Usernames or email addresses to invite (maximum 50 per call)',
+        },
+      },
+      required: ['tribeId', 'invitees'],
     },
   },
   // User tools
@@ -783,13 +803,24 @@ ${JSON.stringify(createdCase, null, 2)}`,
           name: p.name,
           description: p.description,
           tags: p.tags,
+          isPublic: p.isPublic,
         });
         return {
           content: [
             {
               type: 'text',
-              text: `Tribe created successfully! Note: Creating tribes requires tokens.\n${JSON.stringify(tribe, null, 2)}`,
+              text: `Tribe created successfully!\n${JSON.stringify(tribe, null, 2)}`,
             },
+          ],
+        };
+      }
+
+      case 'tribeunal_invite_tribe_members': {
+        const p = InviteTribeMembersSchema.parse(params);
+        const result = await apiClient.inviteTribeMembers(p.tribeId, p.invitees);
+        return {
+          content: [
+            { type: 'text', text: `Invitations processed.\n${JSON.stringify(result, null, 2)}` },
           ],
         };
       }
