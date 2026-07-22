@@ -9,16 +9,19 @@ export const ListTribesSchema = z.object({
   limit: z.number().min(1).max(100).default(20).describe('Number of results per page'),
 });
 
+// Every tribe identifier is a UUID: the backend resolves tribes by their uuid
+// column only, so a slug or the numeric `id` can never match and simply 404s.
+// Rejecting here says WHICH field to use instead of returning a bare not-found.
 export const GetTribeSchema = z.object({
-  id: z.string().describe('Tribe ID or slug'),
+  id: tribeUuid('Tribe UUID (the tribe\'s uuid field, not its slug or numeric id)'),
 });
 
 export const JoinTribeSchema = z.object({
-  tribeId: z.string().describe('Tribe ID to join'),
+  tribeId: tribeUuid('Tribe UUID to join'),
 });
 
 export const LeaveTribeSchema = z.object({
-  tribeId: z.string().describe('Tribe ID to leave'),
+  tribeId: tribeUuid('Tribe UUID to leave'),
 });
 
 export const CreateTribeSchema = z.object({

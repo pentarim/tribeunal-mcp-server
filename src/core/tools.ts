@@ -362,11 +362,11 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_get_tribe',
     title: 'Get tribe',
     annotations: { title: 'Get tribe', readOnlyHint: true, openWorldHint: false },
-    description: 'Get detailed information about a specific tribe including members and rank structure. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; otherwise it returns 404.',
+    description: 'Get a tribe: name, description, visibility, owner, tags and timestamps. The member roster is NOT included — it was removed because it exposed each member\'s credentials. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; to everyone else it returns 404, the same answer as a tribe that does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Tribe ID or slug' },
+        id: { type: 'string', pattern: UUID_PATTERN, description: 'Tribe UUID (the tribe\'s uuid field, not its slug or numeric id)' },
       },
       required: ['id'],
     },
@@ -379,7 +379,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        tribeId: { type: 'string', description: 'Tribe ID to join' },
+        tribeId: { type: 'string', pattern: UUID_PATTERN, description: 'Tribe UUID to join (the tribe\'s uuid field, not its slug or numeric id)' },
       },
       required: ['tribeId'],
     },
@@ -388,11 +388,11 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_leave_tribe',
     title: 'Leave tribe',
     annotations: { title: 'Leave tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Leave a tribe you are currently a member of',
+    description: 'Leave a tribe you are currently a member of. Leaving a private tribe does not delete the invitation that let you in, so you may rejoin.',
     inputSchema: {
       type: 'object',
       properties: {
-        tribeId: { type: 'string', description: 'Tribe ID to leave' },
+        tribeId: { type: 'string', pattern: UUID_PATTERN, description: 'Tribe UUID to leave (the tribe\'s uuid field, not its slug or numeric id)' },
       },
       required: ['tribeId'],
     },

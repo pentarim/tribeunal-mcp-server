@@ -151,3 +151,55 @@ test('join_tribe documents the invitation-only rule rather than a token fee', ()
   assert.match(description, /invitation/i);
   assert.equal(/membership fee|require tokens/i.test(description), false);
 });
+
+// --- identifiers are UUIDs on every tribe tool -------------------------------
+
+// A slug never actually worked: the backend resolves tribes by their uuid column,
+// so a slug used to 500 and now 404s. Rejecting here names the right field.
+for (const [tool, param] of [
+  ['tribeunal_get_tribe', 'id'],
+  ['tribeunal_join_tribe', 'tribeId'],
+  ['tribeunal_leave_tribe', 'tribeId'],
+  ['tribeunal_invite_tribe_members', 'tribeId'],
+] as const) {
+  test(`${tool} rejects a slug or numeric id for ${param}`, async () => {
+    const record: Record<string, never> = {};
+    for (const bad of ['some-tribe-slug', '12345']) {
+      await assert.rejects(
+        () => dispatchToolCall(fakeClient(record), tool, {
+          [param]: bad,
+          ...(tool === 'tribeunal_invite_tribe_members' ? { invitees: ['alice'] } : {}),
+        }),
+        /Invalid parameters/,
+        `expected ${tool} to reject ${bad}`,
+      );
+    }
+  });
+
+  test(`${tool} advertises the UUID pattern on ${param}`, () => {
+    const def = TOOL_DEFINITIONS.find((d) => d.name === tool);
+    const prop = (def as { inputSchema: { properties: Record<string, { pattern?: string }> } })
+      .inputSchema.properties[param];
+    assert.ok(prop?.pattern, `${tool}.${param} must advertise a UUID pattern so clients validate before calling`);
+  });
+}
+
+// The member roster was removed from the tribe item because it exposed every
+// member's password hash, email and apiKey. The description must not promise it.
+test('get_tribe does not advertise a member roster it no longer returns', () => {
+  const def = TOOL_DEFINITIONS.find((d) => d.name === 'tribeunal_get_tribe');
+  const description = (def as { description: string }).description;
+
+  // Match a PROMISE of members, not any mention — the description legitimately
+  // names the roster in order to say it is absent.
+  assert.equal(
+    /includ\w* members|includ\w* the member|rank structure|with (its )?members/i.test(description),
+    false,
+    'the item returns no member data, so advertising it sends agents down a dead end',
+  );
+  assert.match(
+    description,
+    /not included|NOT included|no member/i,
+    'it should say plainly that the roster is absent, so an agent does not go looking',
+  );
+});
