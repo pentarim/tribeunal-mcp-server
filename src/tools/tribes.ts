@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { tribeUuid } from './uuid.js';
+
 // Schema definitions
 export const ListTribesSchema = z.object({
   query: z.string().optional().describe('Search query for tribe name or description'),
@@ -31,7 +33,7 @@ export const CreateTribeSchema = z.object({
 
 // Parameters for the tribeunal_invite_tribe_members tool.
 export const InviteTribeMembersSchema = z.object({
-  tribeId: z.string().describe('Tribe ID (UUID) to invite people into — private tribes only'),
+  tribeId: tribeUuid('Tribe UUID to invite people into — private tribes only'),
   invitees: z
     .array(z.string().min(1))
     .min(1)

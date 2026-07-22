@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { dispatchToolCall, TOOL_DEFINITIONS } from '../src/core/tools.js';
 import { CreateTribeSchema, InviteTribeMembersSchema } from '../src/tools/tribes.js';
-import type { TribeunalAPIClient } from '../src/client/api-client.js';
+import { TribeunalAPIError, type TribeunalAPIClient } from '../src/client/api-client.js';
 
 /** Fake client recording whatever the dispatcher hands the API layer. */
 function fakeClient(record: {
@@ -79,12 +79,12 @@ test('create_tribe no longer advertises or accepts a membership fee', () => {
 test('invite_tribe_members forwards tribeId and invitees', async () => {
   const record: Record<string, never> = {};
   await dispatchToolCall(fakeClient(record), 'tribeunal_invite_tribe_members', {
-    tribeId: 'tribe-uuid',
+    tribeId: '1f185d65-4764-614a-8052-1da3f306fec7',
     invitees: ['alice', 'bob@example.com'],
   });
 
   const args = (record as { inviteArgs?: { tribeId: string; invitees: string[] } }).inviteArgs;
-  assert.equal(args?.tribeId, 'tribe-uuid');
+  assert.equal(args?.tribeId, '1f185d65-4764-614a-8052-1da3f306fec7');
   assert.deepEqual(args?.invitees, ['alice', 'bob@example.com']);
 });
 
@@ -99,14 +99,14 @@ test('invite_tribe_members is advertised with the spec parameter names', () => {
 
 test('the batch cap matches the API (50)', () => {
   const invitees = Array.from({ length: 51 }, (_, i) => `cap${i}@example.invalid`);
-  assert.throws(() => InviteTribeMembersSchema.parse({ tribeId: 't', invitees }));
-  assert.doesNotThrow(() => InviteTribeMembersSchema.parse({ tribeId: 't', invitees: invitees.slice(0, 50) }));
+  assert.throws(() => InviteTribeMembersSchema.parse({ tribeId: '1f185d65-4764-614a-8052-1da3f306fec7', invitees }));
+  assert.doesNotThrow(() => InviteTribeMembersSchema.parse({ tribeId: '1f185d65-4764-614a-8052-1da3f306fec7', invitees: invitees.slice(0, 50) }));
 });
 
 test('an empty invitee list is rejected before any request', async () => {
   const record: Record<string, never> = {};
   await assert.rejects(
-    () => dispatchToolCall(fakeClient(record), 'tribeunal_invite_tribe_members', { tribeId: 't', invitees: [] }),
+    () => dispatchToolCall(fakeClient(record), 'tribeunal_invite_tribe_members', { tribeId: '1f185d65-4764-614a-8052-1da3f306fec7', invitees: [] }),
     /Invalid parameters/,
   );
   assert.equal((record as { inviteArgs?: unknown }).inviteArgs, undefined);
@@ -114,12 +114,35 @@ test('an empty invitee list is rejected before any request', async () => {
 
 // --- join surfacing ----------------------------------------------------------
 
-test('a 404 from joining a private tribe surfaces to the caller', async () => {
-  const record: { joinError?: Error } = { joinError: new Error('Tribe not found (404)') };
+test('a 404 from joining a private tribe surfaces through the API-error wrapper', async () => {
+  // A plain Error would be rethrown verbatim and prove nothing; only a
+  // TribeunalAPIError exercises the `API Error: …` surfacing path.
+  const record: { joinError?: Error } = {
+    joinError: new TribeunalAPIError('tribe_not_found', 404),
+  };
   await assert.rejects(
-    () => dispatchToolCall(fakeClient(record as Record<string, never>), 'tribeunal_join_tribe', { tribeId: 'hidden' }),
-    /not found/i,
+    () => dispatchToolCall(fakeClient(record as Record<string, never>), 'tribeunal_join_tribe', {
+      tribeId: '1f185d65-4764-614a-8052-1da3f306fec7',
+    }),
+    /API Error: tribe_not_found/,
   );
+});
+
+// A tribe slug or the numeric `id` that create_tribe/get_tribe hand back reaches the
+// backend's uuid-typed column and returns an opaque HTTP 500. Reject at the boundary.
+test('a non-UUID tribeId is rejected before any request is made', async () => {
+  const record: Record<string, never> = {};
+  for (const bad of ['some-tribe-slug', '12345', 'not-a-uuid']) {
+    await assert.rejects(
+      () => dispatchToolCall(fakeClient(record), 'tribeunal_invite_tribe_members', {
+        tribeId: bad,
+        invitees: ['alice'],
+      }),
+      /Invalid parameters/,
+      `expected ${bad} to be rejected as a tribe identifier`,
+    );
+  }
+  assert.equal((record as { inviteArgs?: unknown }).inviteArgs, undefined, 'nothing may reach the API client');
 });
 
 test('join_tribe documents the invitation-only rule rather than a token fee', () => {

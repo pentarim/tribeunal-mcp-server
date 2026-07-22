@@ -64,9 +64,10 @@ mcp-server/
 #### Tribe Management (5 tools)
 - **`tribeunal_list_tribes`** - Browse available tribes
 - **`tribeunal_get_tribe`** - Get tribe details and member hierarchy
-- **`tribeunal_join_tribe`** - Join tribes (with token requirements)
+- **`tribeunal_join_tribe`** - Join a tribe (private tribes require an invitation)
 - **`tribeunal_leave_tribe`** - Leave tribe membership
-- **`tribeunal_create_tribe`** - Create new interest-based tribes
+- **`tribeunal_create_tribe`** - Create new interest-based tribes (`isPublic: false` for a private, invitation-only tribe)
+- **`tribeunal_invite_tribe_members`** - Invite users (username or email) into a private tribe you own
 
 #### User Profiles (2 tools)
 - **`tribeunal_get_user`** - Get public user information

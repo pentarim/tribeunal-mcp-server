@@ -22,7 +22,7 @@ import type { Env, UserProps } from './types';
  *
  * Tools are registered on the low-level MCP `Server` (exposed by `McpServer` as
  * `.server`) using the SAME JSON-Schema `TOOL_DEFINITIONS` and `dispatchToolCall`
- * the stdio transport uses. This keeps the 33 tools byte-identical across both
+ * the stdio transport uses. This keeps the 34 tools byte-identical across both
  * transports and sidesteps re-deriving Zod shapes for the high-level helper.
  *
  * The three agent-await tools long-poll: their handler blocks for up to

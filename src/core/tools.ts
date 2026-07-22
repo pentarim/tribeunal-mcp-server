@@ -417,11 +417,11 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_invite_tribe_members',
     title: 'Invite tribe members',
     annotations: { title: 'Invite tribe members', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Invite people into a PRIVATE tribe you own, by username or email. Public tribes are already open to everyone, so inviting into one returns 400. Each invitee may then view and join the tribe.',
+    description: 'Invite people into a PRIVATE tribe you own (or any, as an admin), by username or email. Each invitee is resolved independently and reported back with its own outcome — invited / already_invited / already_member / not_found / self — so an unresolvable name does not fail the batch. Each invitee may then view and join the tribe. Public tribes are already open to everyone, so inviting into one returns 400.',
     inputSchema: {
       type: 'object',
       properties: {
-        tribeId: { type: 'string', description: 'Tribe ID (UUID) to invite people into — private tribes only' },
+        tribeId: { type: 'string', pattern: UUID_PATTERN, description: 'Tribe UUID to invite people into (the tribe\'s uuid field, not its slug or numeric id) — private tribes only' },
         invitees: {
           type: 'array',
           items: { type: 'string' },
@@ -818,9 +818,13 @@ ${JSON.stringify(createdCase, null, 2)}`,
       case 'tribeunal_invite_tribe_members': {
         const p = InviteTribeMembersSchema.parse(params);
         const result = await apiClient.inviteTribeMembers(p.tribeId, p.invitees);
+        const s = result.summary ?? {};
         return {
           content: [
-            { type: 'text', text: `Invitations processed.\n${JSON.stringify(result, null, 2)}` },
+            {
+              type: 'text',
+              text: `Tribe invitations processed — invited: ${s.invited ?? '?'}, already invited: ${s.already_invited ?? '?'}, already member: ${s.already_member ?? '?'}, not found: ${s.not_found ?? '?'}, self: ${s.self ?? '?'}.\n\n${JSON.stringify(result, null, 2)}`,
+            },
           ],
         };
       }

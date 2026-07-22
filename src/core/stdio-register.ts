@@ -8,13 +8,13 @@ import type { AwaitContext } from '../tools/activity.js';
 import { TOOL_DEFINITIONS, dispatchToolCall } from './tools.js';
 
 /**
- * Register the 33 Tribeunal tools on a low-level MCP `Server` (the stdio
+ * Register the 34 Tribeunal tools on a low-level MCP `Server` (the stdio
  * transport) using an injected API client.
  *
  * This file is the ONLY core module that imports the low-level `Server` from
  * `@modelcontextprotocol/sdk`. It is used exclusively by the stdio entry point
  * (`src/index.ts`). The Cloudflare worker registers the same TOOL_DEFINITIONS
- * through its own agent (see worker/src/mcp-agent.ts) so the 33 tools stay
+ * through its own agent (see worker/src/mcp-agent.ts) so the 34 tools stay
  * byte-identical across both transports.
  */
 export function registerTools(server: Server, apiClient: TribeunalAPIClient): void {

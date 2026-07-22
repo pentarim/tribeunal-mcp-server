@@ -257,15 +257,18 @@ tribes.items.forEach(tribe => {
 
 ```typescript
 try {
+  // Always pass the tribe's `uuid` — a slug or numeric id is rejected as an
+  // invalid parameter, because the backend resolves tribes by uuid only.
   const result = await client.callTool('tribeunal_join_tribe', {
-    tribeId: 'ai-researchers-tribe'
+    tribeId: '1f185d65-4764-614a-8052-1da3f306fec7'
   });
-  
-  console.log(`Successfully joined ${result.tribeName}!`);
-  console.log(`Your rank: ${result.memberRank}`);
+
+  console.log(`Joined tribe ${result.tribe} with role ${result.role}`);
 } catch (error) {
-  if (error.message.includes('tokens')) {
-    console.log('Insufficient tokens to join this tribe');
+  if (error.message.includes('tribe_not_found')) {
+    // Private tribes are invitation-only, and answer 404 rather than 403 so a
+    // caller cannot tell "you may not join" from "this does not exist".
+    console.log('No such tribe, or it is private and you have no invitation');
   }
 }
 ```

@@ -18,7 +18,7 @@ export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
-function uuidMessage(kind: 'case' | 'side'): string {
+function uuidMessage(kind: 'case' | 'side' | 'tribe'): string {
   return `Must be a ${kind} UUID (the ${kind}'s "uuid" field, e.g. 8415a252-5e41-4db6-bd5d-ee5b5ad95dd4) — not a numeric id, slug, or name.`;
 }
 
@@ -30,6 +30,15 @@ export function caseUuid(description: string) {
 /** A zod string constrained to the UUID form, for a side identifier. */
 export function sideUuid(description: string) {
   return z.string().regex(UUID_RE, uuidMessage('side')).describe(description);
+}
+
+/**
+ * A zod string constrained to the UUID form, for a tribe identifier. `tribe.uuid`
+ * is a uuid-typed column, so a slug or the numeric `id` that create_tribe/get_tribe
+ * hand back reaches DBAL as a conversion error and returns an opaque HTTP 500.
+ */
+export function tribeUuid(description: string) {
+  return z.string().regex(UUID_RE, uuidMessage('tribe')).describe(description);
 }
 
 /**
