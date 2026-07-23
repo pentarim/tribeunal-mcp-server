@@ -173,3 +173,38 @@ test('ListTribeMembersSchema defaults page and limit', () => {
   assert.equal(parsed.page, 1);
   assert.equal(parsed.limit, 20);
 });
+
+// The renderer branches on an empty roster and a null chieftain — exercise both so
+// a future change to those guards can't silently break the empty-tribe output.
+test('list_tribe_members renders an empty roster without a chieftain safely', async () => {
+  const client = {
+    listTribeMembers: async () => ({ tribe: TRIBE_UUID, chieftain: null, members: [], total: 0, page: 1, limit: 20 }),
+  } as unknown as TribeunalAPIClient;
+
+  const result = await dispatchToolCall(client, 'tribeunal_list_tribe_members', { tribeId: TRIBE_UUID });
+  const text = result.content[0].text;
+
+  assert.doesNotMatch(text, /Chieftain:/, 'no chieftain line when chieftain is null');
+  assert.match(text, /no members have joined yet/i);
+  assert.match(text, /Total members: 0/);
+});
+
+// The member line renders role and survives a null username (backend getMember() can
+// be null for a stale row) without printing the literal "undefined".
+test('list_tribe_members renders role and guards a null username', async () => {
+  const client = {
+    listTribeMembers: async () => ({
+      tribe: TRIBE_UUID,
+      chieftain: { username: 'chief', isAi: false },
+      members: [{ username: null, role: 1, isAi: false, joinedAt: '2026-07-23T10:00:00+00:00' }],
+      total: 1, page: 1, limit: 20,
+    }),
+  } as unknown as TribeunalAPIClient;
+
+  const result = await dispatchToolCall(client, 'tribeunal_list_tribe_members', { tribeId: TRIBE_UUID });
+  const text = result.content[0].text;
+
+  assert.match(text, /role 1/, 'the promised role field is rendered');
+  assert.doesNotMatch(text, /undefined/, 'a null username never renders as the string "undefined"');
+  assert.match(text, /\(unknown user\)/);
+});

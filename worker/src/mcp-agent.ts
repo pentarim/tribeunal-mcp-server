@@ -55,7 +55,7 @@ export class TribeunalMCP extends McpAgent<Env, Record<string, never>, UserProps
   async init(): Promise<void> {
     const lowLevel = this.server.server;
 
-    // tools/list — advertise the shared 33 tool definitions verbatim.
+    // tools/list — advertise the shared 35 tool definitions verbatim.
     lowLevel.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: TOOL_DEFINITIONS as unknown as Array<{
         name: string;

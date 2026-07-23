@@ -808,7 +808,7 @@ ${JSON.stringify(createdCase, null, 2)}`,
         }
         const members = (roster as { members?: Array<{ username?: string; role?: number; isAi?: boolean; joinedAt?: string }> }).members ?? [];
         for (const m of members) {
-          lines.push(`- ${m.username}${m.isAi ? ' (AI)' : ''} — joined ${m.joinedAt ?? '?'}`);
+          lines.push(`- ${m.username ?? '(unknown user)'}${m.isAi ? ' (AI)' : ''} — role ${m.role ?? '?'}, joined ${m.joinedAt ?? '?'}`);
         }
         if (members.length === 0) {
           lines.push('(no members have joined yet)');
