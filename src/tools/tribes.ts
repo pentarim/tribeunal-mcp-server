@@ -16,6 +16,15 @@ export const GetTribeSchema = z.object({
   id: tribeUuid('Tribe UUID (the tribe\'s uuid field, not its slug or numeric id)'),
 });
 
+// Parameters for the tribeunal_list_tribe_members tool. The roster is member-only,
+// so tribeId is a UUID just like every other tribe identifier; page/limit mirror the
+// backend's clamp ([1,100]).
+export const ListTribeMembersSchema = z.object({
+  tribeId: tribeUuid('Tribe UUID whose member roster to read (you must be a member, the owner, or an admin)'),
+  page: z.number().min(1).default(1).describe('Page number for pagination'),
+  limit: z.number().min(1).max(100).default(20).describe('Number of members per page'),
+});
+
 export const JoinTribeSchema = z.object({
   tribeId: tribeUuid('Tribe UUID to join'),
 });

@@ -184,14 +184,15 @@ for (const [tool, param] of [
   });
 }
 
-// The member roster was removed from the tribe item because it exposed every
-// member's password hash, email and apiKey. The description must not promise it.
-test('get_tribe does not advertise a member roster it no longer returns', () => {
+// The tribe item still carries NO member data (that was removed because it
+// exposed every member's password hash, email and apiKey). The description must
+// not promise a roster in the item — but it should now point agents at the
+// dedicated, member-only tribeunal_list_tribe_members tool.
+test('get_tribe points to the list_tribe_members tool for the roster', () => {
   const def = TOOL_DEFINITIONS.find((d) => d.name === 'tribeunal_get_tribe');
   const description = (def as { description: string }).description;
 
-  // Match a PROMISE of members, not any mention — the description legitimately
-  // names the roster in order to say it is absent.
+  // Match a PROMISE that the ITEM includes members — it does not.
   assert.equal(
     /includ\w* members|includ\w* the member|rank structure|with (its )?members/i.test(description),
     false,
@@ -199,7 +200,7 @@ test('get_tribe does not advertise a member roster it no longer returns', () => 
   );
   assert.match(
     description,
-    /not included|NOT included|no member/i,
-    'it should say plainly that the roster is absent, so an agent does not go looking',
+    /list_tribe_members/,
+    'get_tribe should direct agents to tribeunal_list_tribe_members for the roster',
   );
 });

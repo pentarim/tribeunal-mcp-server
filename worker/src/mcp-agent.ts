@@ -15,14 +15,14 @@ import type { Env, UserProps } from './types';
  * Authentication is handled upstream by `@cloudflare/workers-oauth-provider`
  * (see `index.ts` + `auth0-handler.ts`): by the time `init()` runs, the user has
  * completed Auth0 Universal Login and `this.props` carries their Auth0 access
- * token. Every one of the 33 shared tools is therefore executed AS the
+ * token. Every one of the 35 shared tools is therefore executed AS the
  * logged-in human — the API client forwards `props.upstreamAccessToken` as a
  * Bearer token, which the Symfony resource server validates and maps to that
  * user.
  *
  * Tools are registered on the low-level MCP `Server` (exposed by `McpServer` as
  * `.server`) using the SAME JSON-Schema `TOOL_DEFINITIONS` and `dispatchToolCall`
- * the stdio transport uses. This keeps the 34 tools byte-identical across both
+ * the stdio transport uses. This keeps the 35 tools byte-identical across both
  * transports and sidesteps re-deriving Zod shapes for the high-level helper.
  *
  * The three agent-await tools long-poll: their handler blocks for up to

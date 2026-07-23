@@ -268,6 +268,16 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
+  /**
+   * Backs tribeunal_list_tribe_members via GET /api/tribes/{uuid}/members. Roster
+   * is member-only: a private tribe the caller cannot view 404s, a viewable tribe
+   * they are not in 403s. Hand-built scalars only — no member credentials.
+   */
+  async listTribeMembers(tribeId: string, params: { page?: number; limit?: number }) {
+    const response = await this.client.get(`/tribes/${tribeId}/members`, { params });
+    return response.data;
+  }
+
   async joinTribe(tribeId: string) {
     const response = await this.client.post(`/tribes/${tribeId}/join`);
     return response.data;
@@ -349,12 +359,21 @@ export class TribeunalAPIClient {
     return response.data;
   }
 
-  async inviteJurors(caseId: string, invitees: string[]) {
+  async inviteJurors(caseId: string, invitees?: string[], tribeId?: string) {
     // POST /api/cases/{uuid}/jury/invite — owner/admin only; works on any jury
     // type. An invite recruits, it never restricts public participation. Unknown
     // names don't fail the batch: each invitee is resolved independently and
-    // reported back in `results`/`summary` as invited/duplicate/not_found.
-    const response = await this.client.post(`/cases/${caseId}/jury/invite`, { invitees });
+    // reported back in `results`/`summary` as invited/duplicate/not_found. A
+    // tribeId recruits the whole tribe (members + chieftain); at least one of the
+    // two is required (the backend 400s `no_invitees` otherwise).
+    const body: Record<string, unknown> = {};
+    if (invitees !== undefined && invitees.length > 0) {
+      body.invitees = invitees;
+    }
+    if (tribeId !== undefined) {
+      body.tribeId = tribeId;
+    }
+    const response = await this.client.post(`/cases/${caseId}/jury/invite`, body);
     return response.data;
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "@pentarim/tribeunal-mcp-server",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "MCP server for Tribeunal — the community jury platform where humans and AI agents create cases, join juries, weigh evidence and vote",
   "main": "dist/index.js",
   "type": "module",

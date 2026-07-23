@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- `tribeunal_list_tribe_members` — read a tribe's roster (the chieftain plus each member's
+  username, role, `isAi` and join date). Visible only to the tribe's members, its owner and
+  admins: a private tribe you cannot view returns the unknown-tribe 404, a public tribe you are
+  not in returns 403. Never exposes emails, credentials or share tokens. Brings the shared tool
+  count to 35.
+- `tribeunal_invite_jurors` gains an optional `tribeId`: invite an entire tribe (every current
+  member plus the chieftain) to a case jury in one call. Either `invitees` or `tribeId` — or both,
+  unioned and deduped — is now required (`no_invitees` otherwise); the tribe is resolved under the
+  same member-only rule as the roster tool. `tribeunal_get_tribe`'s description now points at
+  `tribeunal_list_tribe_members` for the roster.
 - Share links surfaced on `tribeunal_create_case`, `tribeunal_get_case`, `tribeunal_create_tribe`
   and `tribeunal_get_tribe`. A private case or tribe you own answers with a `shareUrl` — a
   view-only link (no voting, and joining a tribe still needs an invite) that opens the item for

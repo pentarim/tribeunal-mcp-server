@@ -29,6 +29,7 @@ import {
 import {
   ListTribesSchema,
   GetTribeSchema,
+  ListTribeMembersSchema,
   JoinTribeSchema,
   LeaveTribeSchema,
   CreateTribeSchema,
@@ -362,13 +363,28 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_get_tribe',
     title: 'Get tribe',
     annotations: { title: 'Get tribe', readOnlyHint: true, openWorldHint: false },
-    description: 'Get a tribe: name, description, visibility, owner, tags and timestamps. The member roster is NOT included — it was removed because it exposed each member\'s credentials. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; to everyone else it returns 404, the same answer as a tribe that does not exist. For a private tribe you own, the response includes a shareUrl: a view-only link (joining still needs an invite) you can send to anyone; rotate it from the tribe web page to revoke old links.',
+    description: 'Get a tribe: name, description, visibility, owner, tags and timestamps. The member roster is not part of this response — read it with tribeunal_list_tribe_members, which is visible to the tribe\'s members, its owner and admins only. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; to everyone else it returns 404, the same answer as a tribe that does not exist. For a private tribe you own, the response includes a shareUrl: a view-only link (joining still needs an invite) you can send to anyone; rotate it from the tribe web page to revoke old links.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', pattern: UUID_PATTERN, description: 'Tribe UUID (the tribe\'s uuid field, not its slug or numeric id)' },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'tribeunal_list_tribe_members',
+    title: 'List tribe members',
+    annotations: { title: 'List tribe members', readOnlyHint: true, openWorldHint: false },
+    description: 'List who is in a tribe: the chieftain plus each member\'s username, role, whether they are an AI, and when they joined. Readable only by the tribe\'s members, its owner and admins — to everyone else it returns the same 404 as an unknown tribe (private) or 403 (a public tribe you are not in). Never exposes emails, credentials or share tokens. Use this to see a roster before inviting a whole tribe to a case jury (tribeunal_invite_jurors accepts a tribeId).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tribeId: { type: 'string', pattern: UUID_PATTERN, description: 'Tribe UUID whose roster to read (the tribe\'s uuid field, not its slug or numeric id)' },
+        page: { type: 'number', minimum: 1, default: 1, description: 'Page number for pagination' },
+        limit: { type: 'number', minimum: 1, maximum: 100, default: 20, description: 'Number of members per page' },
+      },
+      required: ['tribeId'],
     },
   },
   {
@@ -551,15 +567,16 @@ export const TOOL_DEFINITIONS = [
     title: 'Invite jurors',
     annotations: { title: 'Invite jurors', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description:
-      'Invite users to the jury of a case you own (owner or admin only). Works on any case regardless of jury type — an invitation is recruitment, not restriction: on a public-jury case it notifies the invitee and its accept link seats them as a normal juror, and it never restricts the open participation a public case already grants everyone. Accepts usernames or email addresses; each invitee is processed independently — the response reports invited / duplicate / not_found per entry.',
+      'Invite users to the jury of a case you own (owner or admin only). Works on any case regardless of jury type — an invitation is recruitment, not restriction: on a public-jury case it notifies the invitee and its accept link seats them as a normal juror, and it never restricts the open participation a public case already grants everyone. Provide `invitees` (usernames or emails) and/or a `tribeId` to invite an entire tribe (every current member plus the chieftain) — at least one is required. You must be a member, owner or admin of any tribe you name. Each invitee is processed independently — the response reports invited / duplicate / not_found per entry.',
     inputSchema: {
       type: 'object',
       properties: {
         caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID (owner or admin only)' },
         invitees: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 1, maxItems: 50,
-                    description: 'Usernames or email addresses to invite (1-50)' },
+                    description: 'Usernames or email addresses to invite (1-50). Optional if tribeId is given.' },
+        tribeId: { type: 'string', pattern: UUID_PATTERN, description: 'Optional tribe UUID: invite every current member plus the chieftain. You must be a member, owner or admin of the tribe.' },
       },
-      required: ['caseId', 'invitees'],
+      required: ['caseId'],
     },
   },
 ] as const;
@@ -781,6 +798,27 @@ ${JSON.stringify(createdCase, null, 2)}`,
         return { content: [{ type: 'text', text: JSON.stringify(tribe, null, 2) }] };
       }
 
+      case 'tribeunal_list_tribe_members': {
+        const p = ListTribeMembersSchema.parse(params);
+        const roster = await apiClient.listTribeMembers(p.tribeId, { page: p.page, limit: p.limit });
+        const lines: string[] = [];
+        const chief = (roster as { chieftain?: { username?: string; isAi?: boolean } }).chieftain;
+        if (chief?.username) {
+          lines.push(`Chieftain: ${chief.username}${chief.isAi ? ' (AI)' : ''}`);
+        }
+        const members = (roster as { members?: Array<{ username?: string; role?: number; isAi?: boolean; joinedAt?: string }> }).members ?? [];
+        for (const m of members) {
+          lines.push(`- ${m.username}${m.isAi ? ' (AI)' : ''} — joined ${m.joinedAt ?? '?'}`);
+        }
+        if (members.length === 0) {
+          lines.push('(no members have joined yet)');
+        }
+        const total = (roster as { total?: number }).total ?? members.length;
+        const page = (roster as { page?: number }).page ?? p.page;
+        lines.push(`Total members: ${total} (page ${page})`);
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      }
+
       case 'tribeunal_join_tribe': {
         const p = JoinTribeSchema.parse(params);
         const result = await apiClient.joinTribe(p.tribeId);
@@ -939,7 +977,7 @@ ${JSON.stringify(createdCase, null, 2)}`,
 
       case 'tribeunal_invite_jurors': {
         const p = InviteJurorsSchema.parse(params);
-        const result = await apiClient.inviteJurors(p.caseId, p.invitees);
+        const result = await apiClient.inviteJurors(p.caseId, p.invitees, p.tribeId);
         const s = result.summary ?? {};
         return {
           content: [
