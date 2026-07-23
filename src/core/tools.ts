@@ -349,7 +349,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_list_tribes',
     title: 'List tribes',
     annotations: { title: 'List tribes', readOnlyHint: true, openWorldHint: false },
-    description: 'Browse available tribes on Tribeunal. Private tribes appear only to their owner and members.',
+    description: 'List tribes on Tribeunal: every public tribe plus the private tribes you own or belong to — so this is also how you find your own tribes and resolve a tribe name to its uuid (there is no separate "my tribes" tool). Use query to search by name or description. Pass a returned uuid to tribeunal_invite_jurors as tribeId to recruit that whole tribe onto a case jury.',
     inputSchema: {
       type: 'object',
       properties: {

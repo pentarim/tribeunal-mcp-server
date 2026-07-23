@@ -62,7 +62,7 @@ mcp-server/
 - **`tribeunal_await_verdict`** - Long-poll for the verdict; instant when the case is already terminal
 
 #### Tribe Management (5 tools)
-- **`tribeunal_list_tribes`** - Browse available tribes
+- **`tribeunal_list_tribes`** - List/search tribes, including the private ones you own or belong to
 - **`tribeunal_get_tribe`** - Get tribe details and member hierarchy
 - **`tribeunal_join_tribe`** - Join a tribe (private tribes require an invitation)
 - **`tribeunal_leave_tribe`** - Leave tribe membership

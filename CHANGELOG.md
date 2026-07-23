@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Fixed
+- `tribeunal_list_tribes` no longer describes itself as public browsing: the description now
+  says the list includes the private tribes you own or belong to — so it doubles as "find my
+  tribes" and resolves a tribe name to its uuid — and points at `tribeunal_invite_jurors`'s
+  `tribeId` for recruiting a whole tribe onto a case jury. Root cause of the "ask my family
+  tribe" report: the agent, seeing only a browse tool, never called it, asked the user for the
+  tribe's UUID and fell back to a bare share link. No schema or dispatch change.
 - `tribeunal_create_case` no longer leads with the bare url for a locked-private case: the
   `shareUrl` line comes first and the bare url is labeled "Owner-only URL (requires your login;
   404s anyone else)". If the backend returns no `shareUrl` for a private case, the tool now says
