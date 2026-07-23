@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- Share links surfaced on `tribeunal_create_case`, `tribeunal_get_case`, `tribeunal_create_tribe`
+  and `tribeunal_get_tribe`. A private case or tribe you own answers with a `shareUrl` — a
+  view-only link (no voting, and joining a tribe still needs an invite) that opens the item for
+  whoever holds it, where the bare url 404s a logged-out visitor. `create_case` now prints the
+  `shareUrl` on its view-and-share line (falling back to the plain url for a public case), and
+  `create_tribe` adds a share-link line when the response carries one; `get_case`/`get_tribe`
+  pass the field through untouched. Rotate a share link from the item's web page to revoke every
+  old link at once. All four tool descriptions document this.
 - `tribeunal_invite_tribe_members` — invite people into a PRIVATE tribe you own, by username
   or email (max 50 per call). Each invitee may then view and join the tribe. Public tribes are
   already open to everyone, so inviting into one returns 400 `tribe_not_private`.

@@ -73,7 +73,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_create_case',
     title: 'Create case',
     annotations: { title: 'Create case', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first. Set visibility to "private" to keep a case visible only to you, your invited jurors and admins (a private case runs an invited jury). Add allowsGuestVotes to a private case to make a link-poll instead: unlisted everywhere, but readable and votable by anyone you send the link to.',
+    description: 'Create a new case on Tribeunal for community decision-making (case = jury decides, advice = creator decides, poll = opinion gathering). Use this directly when the user wants to start, decide, settle, or put something to a vote and no specific existing case is referenced — do NOT search first. Set visibility to "private" to keep a case visible only to you, your invited jurors and admins (a private case runs an invited jury). Add allowsGuestVotes to a private case to make a link-poll instead: unlisted everywhere, but readable and votable by anyone you send the link to. A private case answers with a shareUrl — a view-only link (no voting/joining) you can send to anyone; rotate it from the case web page to revoke every old link at once.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -128,7 +128,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_get_case',
     title: 'Get case',
     annotations: { title: 'Get case', readOnlyHint: true, openWorldHint: false },
-    description: 'Get detailed information about a specific case',
+    description: 'Get detailed information about a specific case. For a private case you own, the response includes a shareUrl: a view-only link (no voting/joining) you can send to anyone; rotate it from the case web page to revoke old links.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -362,7 +362,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_get_tribe',
     title: 'Get tribe',
     annotations: { title: 'Get tribe', readOnlyHint: true, openWorldHint: false },
-    description: 'Get a tribe: name, description, visibility, owner, tags and timestamps. The member roster is NOT included — it was removed because it exposed each member\'s credentials. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; to everyone else it returns 404, the same answer as a tribe that does not exist.',
+    description: 'Get a tribe: name, description, visibility, owner, tags and timestamps. The member roster is NOT included — it was removed because it exposed each member\'s credentials. A private tribe is only readable by its owner, its members and anyone holding a pending invitation; to everyone else it returns 404, the same answer as a tribe that does not exist. For a private tribe you own, the response includes a shareUrl: a view-only link (joining still needs an invite) you can send to anyone; rotate it from the tribe web page to revoke old links.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -401,7 +401,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_create_tribe',
     title: 'Create tribe',
     annotations: { title: 'Create tribe', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Create a new interest-based tribe. Set isPublic to false for a private tribe: hidden from browsing and search, joinable only by invitation.',
+    description: 'Create a new interest-based tribe. Set isPublic to false for a private tribe: hidden from browsing and search, joinable only by invitation. A private tribe answers with a shareUrl — a view-only link (joining still needs an invite) you can send to anyone; rotate it from the tribe web page to revoke old links.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -601,6 +601,10 @@ export async function dispatchToolCall(
         // the `uuid` on follow-up calls (a numeric id would 500 backend-side).
         const createdCase = caseWithUuidOnly(await apiClient.createCase(p));
         const url = createdCase.url || `https://tribeunal.test/cases/${createdCase.slug}`;
+        // A private case answers with a shareUrl: a view-only link that opens the case
+        // for whoever holds it, where the bare url would 404 a logged-out visitor. Share
+        // that instead of the plain url; a public case has none, so fall back to url.
+        const shareUrl = createdCase.shareUrl || url;
         return {
           content: [
             {
@@ -610,7 +614,7 @@ export async function dispatchToolCall(
 UUID: ${createdCase.uuid}
 URL: ${url}
 
-You can view and share the case at: ${url}
+You can view and share the case at: ${shareUrl}
 
 Full response:
 ${JSON.stringify(createdCase, null, 2)}`,
@@ -805,11 +809,15 @@ ${JSON.stringify(createdCase, null, 2)}`,
           tags: p.tags,
           isPublic: p.isPublic,
         });
+        // A private tribe answers with a shareUrl: a view-only link that opens the tribe
+        // for whoever holds it (the bare page 404s a logged-out visitor). A public tribe
+        // has none, so the line is only added when present.
+        const shareLine = tribe.shareUrl ? `\nShare link (view-only): ${tribe.shareUrl}` : '';
         return {
           content: [
             {
               type: 'text',
-              text: `Tribe created successfully!\n${JSON.stringify(tribe, null, 2)}`,
+              text: `Tribe created successfully!${shareLine}\n${JSON.stringify(tribe, null, 2)}`,
             },
           ],
         };
