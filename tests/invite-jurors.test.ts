@@ -45,6 +45,51 @@ test('tribeunal_invite_jurors dispatches to inviteJurors and returns a text resu
   assert.match(r.content[0].text, /not found: 1/);
 });
 
+test('tribeunal_invite_jurors surfaces the private case share link from the response', async () => {
+  const shareUrl = 'https://tribeunal.test/cases/priv-slug?share=' + 'a'.repeat(64);
+  const client = fakeClient({}, {
+    status: 'success',
+    case: {
+      uuid: 'abc',
+      state: 'open',
+      juryType: 'invited',
+      url: 'https://tribeunal.test/cases/priv-slug',
+      shareUrl,
+    },
+    results: [{ contact: 'bob', outcome: 'invited', username: 'bob', isExternalEmail: false }],
+    summary: { invited: 1, duplicate: 0, not_found: 0 },
+  });
+
+  const r = await dispatchToolCall(client, 'tribeunal_invite_jurors', {
+    caseId: CASE_UUID,
+    invitees: ['bob'],
+  });
+
+  assert.ok(Array.isArray(r.content) && r.content[0]?.type === 'text');
+  assert.ok(
+    r.content[0].text.includes('Share link (view-only, works for anyone): ' + shareUrl),
+    'the share link must be surfaced on its own labeled line',
+  );
+});
+
+test('tribeunal_invite_jurors adds no share-link line when the case has none', async () => {
+  const client = fakeClient({}, {
+    status: 'success',
+    case: { uuid: 'abc', state: 'open', juryType: 'public', url: 'https://tribeunal.test/cases/pub-slug', shareUrl: null },
+    results: [{ contact: 'bob', outcome: 'invited', username: 'bob', isExternalEmail: false }],
+    summary: { invited: 1, duplicate: 0, not_found: 0 },
+  });
+
+  const r = await dispatchToolCall(client, 'tribeunal_invite_jurors', {
+    caseId: CASE_UUID,
+    invitees: ['bob'],
+  });
+
+  assert.ok(Array.isArray(r.content) && r.content[0]?.type === 'text');
+  assert.ok(!r.content[0].text.includes('Share link'), 'no share-link line for a public case');
+  assert.ok(!r.content[0].text.includes('?share='), 'no token anywhere in the output');
+});
+
 test('tribeunal_invite_jurors rejects a missing caseId with a validation error', async () => {
   const client = fakeClient({}, { status: 'success' });
   await assert.rejects(

@@ -567,7 +567,7 @@ export const TOOL_DEFINITIONS = [
     title: 'Invite jurors',
     annotations: { title: 'Invite jurors', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description:
-      'Invite users to the jury of a case you own (owner or admin only). Works on any case regardless of jury type — an invitation is recruitment, not restriction: on a public-jury case it notifies the invitee and its accept link seats them as a normal juror, and it never restricts the open participation a public case already grants everyone. Provide `invitees` (usernames or emails) and/or a `tribeId` to invite an entire tribe (every current member plus the chieftain) — at least one is required. You must be a member, owner or admin of any tribe you name. Each invitee is processed independently — the response reports invited / duplicate / not_found per entry.',
+      'Invite users to the jury of a case you own (owner or admin only). Works on any case regardless of jury type — an invitation is recruitment, not restriction: on a public-jury case it notifies the invitee and its accept link seats them as a normal juror, and it never restricts the open participation a public case already grants everyone. Provide `invitees` (usernames or emails) and/or a `tribeId` to invite an entire tribe (every current member plus the chieftain) — at least one is required. You must be a member, owner or admin of any tribe you name. Each invitee is processed independently — the response reports invited / duplicate / not_found per entry. The response also echoes the case url and, for a private case, its view-only shareUrl — when telling people about a private case, give them the shareUrl (the bare url 404s anyone without access).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -617,27 +617,33 @@ export async function dispatchToolCall(
         // UUID-only outward contract: drop the numeric `id` so the agent reuses
         // the `uuid` on follow-up calls (a numeric id would 500 backend-side).
         const createdCase = caseWithUuidOnly(await apiClient.createCase(p));
-        const url = createdCase.url || `https://tribeunal.test/cases/${createdCase.slug}`;
-        // A private case answers with a shareUrl: a view-only link that opens the case
-        // for whoever holds it, where the bare url would 404 a logged-out visitor. Share
-        // that instead of the plain url; a public case has none, so fall back to url.
-        const shareUrl = createdCase.shareUrl || url;
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Case created successfully!
-
-UUID: ${createdCase.uuid}
-URL: ${url}
-
-You can view and share the case at: ${shareUrl}
-
-Full response:
-${JSON.stringify(createdCase, null, 2)}`,
-            },
-          ],
-        };
+        // Never fabricate a link: the backend always sends `url`, and a made-up
+        // fallback would point at the wrong host.
+        const url = createdCase.url;
+        // A locked-private case's bare url 404s everyone but the owner; its shareUrl
+        // is the only link safe to hand out, so it leads and the bare url is labeled.
+        // A link-poll (private + guest votes) is the exception: link holders view AND
+        // vote via the bare url, so that stays the shareable link, as for public cases.
+        const lockedPrivate = createdCase.visibility === 'private' && createdCase.allowsGuestVotes !== true;
+        const lines = ['Case created successfully!', '', `UUID: ${createdCase.uuid}`];
+        if (lockedPrivate && createdCase.shareUrl) {
+          lines.push('', `You can view and share the case at: ${createdCase.shareUrl}`);
+          if (url) {
+            lines.push('', `Owner-only URL (requires your login; 404s anyone else): ${url}`);
+          }
+        } else if (lockedPrivate) {
+          if (url) {
+            lines.push('', `Owner-only URL (requires your login; 404s anyone else): ${url}`);
+          }
+          lines.push(
+            '',
+            'No share link came back for this private case — do not hand out the URL above; fetch the shareUrl with tribeunal_get_case before sharing.',
+          );
+        } else if (url) {
+          lines.push(`URL: ${url}`, '', `You can view and share the case at: ${url}`);
+        }
+        lines.push('', 'Full response:', JSON.stringify(createdCase, null, 2));
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 
       case 'tribeunal_search_cases': {
@@ -979,11 +985,16 @@ ${JSON.stringify(createdCase, null, 2)}`,
         const p = InviteJurorsSchema.parse(params);
         const result = await apiClient.inviteJurors(p.caseId, p.invitees, p.tribeId);
         const s = result.summary ?? {};
+        // A private case's response echoes the owner's tokenized share link — surface
+        // it so a bare (404-trap) url shown earlier can still be corrected here.
+        const shareLine = result.case?.shareUrl
+          ? `\nShare link (view-only, works for anyone): ${result.case.shareUrl}`
+          : '';
         return {
           content: [
             {
               type: 'text',
-              text: `Jury invitations processed — invited: ${s.invited ?? '?'}, duplicate: ${s.duplicate ?? '?'}, not found: ${s.not_found ?? '?'}.\n\n${JSON.stringify(result, null, 2)}`,
+              text: `Jury invitations processed — invited: ${s.invited ?? '?'}, duplicate: ${s.duplicate ?? '?'}, not found: ${s.not_found ?? '?'}.${shareLine}\n\n${JSON.stringify(result, null, 2)}`,
             },
           ],
         };

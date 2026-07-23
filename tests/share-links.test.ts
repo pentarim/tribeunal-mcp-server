@@ -57,6 +57,88 @@ test('create_case falls back to the plain url when the response carries no share
   assert.ok(!text.includes('?share='), 'a public case has no share link');
 });
 
+test('create_case shows the share link first and labels the bare url owner-only for a private case', async () => {
+  const client = caseClient({
+    uuid: 'new-uuid',
+    slug: 'priv-slug',
+    url: 'https://tribeunal.test/cases/priv-slug',
+    shareUrl: CASE_SHARE,
+    visibility: 'private',
+  });
+
+  const r = await dispatchToolCall(client, 'tribeunal_create_case', {
+    ...caseArgs,
+    visibility: 'private',
+    juryType: 'invited',
+  });
+  const text = textOf(r);
+
+  assert.ok(!/\nURL: /.test(text), 'no unqualified URL line for a private case — it is a 404 trap');
+  assert.match(
+    text,
+    /Owner-only URL \(requires your login; 404s anyone else\): https:\/\/tribeunal\.test\/cases\/priv-slug\n/,
+    'the bare url must be labeled owner-only',
+  );
+  assert.ok(
+    text.indexOf('view and share the case at') < text.indexOf('Owner-only URL'),
+    'the share link must come before the owner-only url',
+  );
+});
+
+test('create_case never presents the bare url as shareable when a private case lacks a shareUrl', async () => {
+  const client = caseClient({
+    uuid: 'new-uuid',
+    slug: 'priv-slug',
+    url: 'https://tribeunal.test/cases/priv-slug',
+    visibility: 'private',
+  });
+
+  const r = await dispatchToolCall(client, 'tribeunal_create_case', {
+    ...caseArgs,
+    visibility: 'private',
+    juryType: 'invited',
+  });
+  const text = textOf(r);
+
+  assert.ok(!text.includes('view and share the case at'), 'a bare private url must never be offered as shareable');
+  assert.match(text, /Owner-only URL/, 'the url is still shown, but labeled owner-only');
+  assert.ok(text.includes('tribeunal_get_case'), 'the note must point at get_case to fetch the shareUrl');
+});
+
+test('create_case treats a link-poll (private + guest votes) like a public case: the bare url is the shareable link', async () => {
+  const url = 'https://tribeunal.test/cases/priv-slug';
+  const client = caseClient({
+    uuid: 'new-uuid',
+    slug: 'priv-slug',
+    url,
+    shareUrl: CASE_SHARE,
+    visibility: 'private',
+    allowsGuestVotes: true,
+  });
+
+  const r = await dispatchToolCall(client, 'tribeunal_create_case', {
+    ...caseArgs,
+    visibility: 'private',
+    allowsGuestVotes: true,
+  });
+  const text = textOf(r);
+
+  assert.match(
+    text,
+    /view and share the case at: https:\/\/tribeunal\.test\/cases\/priv-slug\n/,
+    'a link-poll is votable by link holders — the bare url IS the link to share',
+  );
+});
+
+test('create_case does not fabricate a fallback url when the backend omits url', async () => {
+  const client = caseClient({ uuid: 'new-uuid', slug: 'no-url-slug', visibility: 'public' });
+
+  const r = await dispatchToolCall(client, 'tribeunal_create_case', { ...caseArgs });
+  const text = textOf(r);
+
+  assert.ok(!text.includes('cases/no-url-slug'), 'no fabricated tribeunal.test fallback link');
+});
+
 const tribeArgs = { name: 'Test Tribe', description: 'A description long enough to pass validation.' };
 
 test('create_tribe adds a view-only share-link line for a private tribe', async () => {
@@ -78,8 +160,8 @@ test('create_tribe omits the share-link line for a public tribe', async () => {
   assert.ok(!text.includes('Share link'), 'no share-link line for a public tribe');
 });
 
-test('the four case/tribe tool descriptions document share links', () => {
-  for (const name of ['tribeunal_create_case', 'tribeunal_get_case', 'tribeunal_create_tribe', 'tribeunal_get_tribe']) {
+test('the share-surfacing tool descriptions document share links', () => {
+  for (const name of ['tribeunal_create_case', 'tribeunal_get_case', 'tribeunal_create_tribe', 'tribeunal_get_tribe', 'tribeunal_invite_jurors']) {
     const def = TOOL_DEFINITIONS.find((d) => d.name === name) as { description: string } | undefined;
     assert.ok(def, `${name} must exist`);
     assert.ok(/share/i.test(def.description), `${name} description must mention share links`);

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+- `tribeunal_create_case` no longer leads with the bare url for a locked-private case: the
+  `shareUrl` line comes first and the bare url is labeled "Owner-only URL (requires your login;
+  404s anyone else)". If the backend returns no `shareUrl` for a private case, the tool now says
+  so and points at `tribeunal_get_case` instead of silently presenting the 404-trap url as
+  shareable. A link-poll (private + guest votes) keeps the bare url as its shareable link — link
+  holders view and vote through it. Root cause of the "shared case link 404s everyone" report.
+- `tribeunal_create_case` no longer fabricates a `https://tribeunal.test/...` fallback link when
+  the backend response carries no `url`.
+- `tribeunal_invite_jurors` now surfaces the case's `shareUrl` (echoed by the backend to the
+  owner/admin caller) on a labeled share-link line, so a bare link shown earlier in the
+  conversation can still be corrected at the invite step. Its description tells the model to hand
+  out the share link, never the bare url, for private cases.
+
 ### Added
 - `tribeunal_list_tribe_members` — read a tribe's roster (the chieftain plus each member's
   username, role, `isAi` and join date). Visible only to the tribe's members, its owner and
