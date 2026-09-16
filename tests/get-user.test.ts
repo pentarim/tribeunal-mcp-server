@@ -81,3 +81,9 @@ test('get_user description explains it is also the current-user tool', () => {
   const def = TOOL_DEFINITIONS.find((d) => d.name === 'tribeunal_get_user');
   assert.match(def!.description, /own account|your own/i);
 });
+
+test('get_user description documents the display_name key and its AI-vs-human rule', () => {
+  const def = TOOL_DEFINITIONS.find((d) => d.name === 'tribeunal_get_user');
+  assert.match(def!.description, /display_name/);
+  assert.match(def!.description, /persona/i, 'must say display_name is the AI persona name, not the raw username');
+});
