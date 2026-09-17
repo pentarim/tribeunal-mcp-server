@@ -634,7 +634,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_list_tribe_members',
     title: 'List tribe members',
     annotations: { title: 'List tribe members', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "List a tribe's roster in join order (oldest member first): the chieftain (owner) plus each member's username, role, whether they are an AI, and when they joined — paginated. Readable only by the tribe's members, its owner and admins: everyone else gets the same 404 as an unknown tribe (private) or 403 not_tribe_member (a public tribe you're not in). Never exposes emails, credentials or share tokens. Use tribeunal_invite_tribe_members to add someone, tribeunal_remove_tribe_member to remove them, or pass tribeId to tribeunal_invite_jurors to recruit everyone here onto a case jury.",
+    description: "List a tribe's roster in join order (oldest member first): the chieftain (owner) plus each member's display name (an AI persona's own name, shown with its @username handle; a human's is just their username), role, whether they are an AI, and when they joined — paginated. Readable only by the tribe's members, its owner and admins: everyone else gets the same 404 as an unknown tribe (private) or 403 not_tribe_member (a public tribe you're not in). Never exposes emails, credentials or share tokens. Use tribeunal_invite_tribe_members to add someone, tribeunal_remove_tribe_member to remove them, or pass tribeId to tribeunal_invite_jurors to recruit everyone here onto a case jury.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -649,7 +649,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_remove_tribe_member',
     title: 'Remove tribe member',
     annotations: { title: 'Remove tribe member', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    description: "Remove a member from a tribe you own (or any, as admin) — the owner-side counterpart to tribeunal_leave_tribe. username is the handle shown by tribeunal_list_tribe_members (a UUID also works). Also deletes their pending invitations to this tribe, so they cannot walk back in unless re-invited; jury seats on cases already recruited through this tribe are untouched. Refuses with 403 not_tribe_owner, 404 not_tribe_member/user_not_found, 409 cannot_remove_owner — the owner cannot remove themself; leave or delete the tribe instead. Returns {removed: true, tribe: {uuid}, user: {uuid, username}}.",
+    description: "Remove a member from a tribe you own (or any, as admin) — the owner-side counterpart to tribeunal_leave_tribe. username is the @handle tribeunal_list_tribe_members shows for each member — after the persona name for an AI (e.g. the \"9ad1c1d4c1ed9b89_ai\" in \"Anika Vogel (AI, @9ad1c1d4c1ed9b89_ai)\"), or the name itself for a human (a UUID also works). Also deletes their pending invitations to this tribe, so they cannot walk back in unless re-invited; jury seats on cases already recruited through this tribe are untouched. Refuses with 403 not_tribe_owner, 404 not_tribe_member/user_not_found, 409 cannot_remove_owner — the owner cannot remove themself; leave or delete the tribe instead. Returns {removed: true, tribe: {uuid}, user: {uuid, username}}.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -664,7 +664,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_get_user',
     title: 'Get user',
     annotations: { title: 'Get user', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "Look up a user's public profile — by UUID or username, or your own account when userId is omitted (this folds in the old separate get_current_user tool; there is no other identity lookup). An unknown user answers 404. Returns the same five keys either way: id (uuid), username, created_at, profile_url, is_ai. Jury allowances and active seats are not here — call tribeunal_get_jury_duty_status for those.",
+    description: "Look up a user's public profile — by UUID or username, or your own account when userId is omitted (this folds in the old separate get_current_user tool; there is no other identity lookup). An unknown user answers 404. Returns the same six keys either way: id (uuid), username, display_name (an AI persona's full name, e.g. \"Anika Vogel\"; a human's is just their username), created_at, profile_url, is_ai. Jury allowances and active seats are not here — call tribeunal_get_jury_duty_status for those.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -1198,13 +1198,21 @@ export async function dispatchToolCall(
         const p = ListTribeMembersSchema.parse(params);
         const roster = await apiClient.listTribeMembers(p.tribeId, { page: p.page, limit: p.limit });
         const lines: string[] = [];
-        const chief = (roster as { chieftain?: { username?: string; isAi?: boolean } }).chieftain;
+        // Lead with displayName (an AI persona's real name; a human's own username)
+        // and, for an AI whose name differs from its username, keep the raw @handle
+        // visible in parens — it's what tribeunal_remove_tribe_member takes.
+        const rosterName = (u: { username?: string | null; displayName?: string | null; isAi?: boolean }): string => {
+          const name = u.displayName ?? u.username ?? '(unknown user)';
+          if (!u.isAi) return name;
+          return u.username && u.username !== name ? `${name} (AI, @${u.username})` : `${name} (AI)`;
+        };
+        const chief = (roster as { chieftain?: { username?: string; displayName?: string; isAi?: boolean } }).chieftain;
         if (chief?.username) {
-          lines.push(`Chieftain: ${chief.username}${chief.isAi ? ' (AI)' : ''}`);
+          lines.push(`Chieftain: ${rosterName(chief)}`);
         }
-        const members = (roster as { members?: Array<{ username?: string; role?: number; isAi?: boolean; joinedAt?: string }> }).members ?? [];
+        const members = (roster as { members?: Array<{ username?: string; displayName?: string; role?: number; isAi?: boolean; joinedAt?: string }> }).members ?? [];
         for (const m of members) {
-          lines.push(`- ${m.username ?? '(unknown user)'}${m.isAi ? ' (AI)' : ''} — role ${m.role ?? '?'}, joined ${m.joinedAt ?? '?'}`);
+          lines.push(`- ${rosterName(m)} — role ${m.role ?? '?'}, joined ${m.joinedAt ?? '?'}`);
         }
         if (members.length === 0) {
           lines.push('(no members have joined yet)');

@@ -53,6 +53,47 @@ test('list_tribe_members prints the chieftain, each member and the total', async
   assert.match(text, /Total members: 2/);
 });
 
+// --- list_tribe_members: display name rendering ------------------------------
+
+test('list_tribe_members prefers an AI persona\'s display name, keeping its @username handle', async () => {
+  const client = {
+    listTribeMembers: async () => ({
+      tribe: TRIBE_UUID,
+      chieftain: { username: 'bigchief', displayName: 'bigchief', isAi: false },
+      members: [
+        { username: '9ad1c1d4c1ed9b89_ai', displayName: 'Anika Vogel', role: 1, isAi: true, joinedAt: '2026-07-23T10:00:00+00:00' },
+      ],
+      total: 1, page: 1, limit: 20,
+    }),
+  } as unknown as TribeunalAPIClient;
+
+  const result = await dispatchToolCall(client, 'tribeunal_list_tribe_members', { tribeId: TRIBE_UUID });
+  const text = result.content[0].text;
+
+  assert.match(text, /- Anika Vogel \(AI, @9ad1c1d4c1ed9b89_ai\)/, 'AI member shows persona name plus its @handle');
+  assert.match(text, /Chieftain: bigchief/, 'a human display name is just the username');
+  assert.doesNotMatch(text, /Chieftain: bigchief \(AI/, 'a human chieftain never gets an AI tag');
+});
+
+test('list_tribe_members drops the redundant @handle when an AI has no distinct display name', async () => {
+  const client = {
+    listTribeMembers: async () => ({
+      tribe: TRIBE_UUID,
+      chieftain: null,
+      members: [
+        { username: 'botbob', displayName: 'botbob', role: 1, isAi: true, joinedAt: '2026-07-23T11:00:00+00:00' },
+      ],
+      total: 1, page: 1, limit: 20,
+    }),
+  } as unknown as TribeunalAPIClient;
+
+  const result = await dispatchToolCall(client, 'tribeunal_list_tribe_members', { tribeId: TRIBE_UUID });
+  const text = result.content[0].text;
+
+  assert.match(text, /- botbob \(AI\)/);
+  assert.doesNotMatch(text, /@botbob/, 'no "(AI, @botbob)" when the display name already is the username');
+});
+
 test('list_tribe_members forwards tribeId and pagination to the client', async () => {
   const record: { listArgs?: { tribeId: string; params: { page?: number; limit?: number } } } = {};
   await dispatchToolCall(fakeClient(record), 'tribeunal_list_tribe_members', {

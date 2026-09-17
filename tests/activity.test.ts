@@ -23,6 +23,7 @@ function evt(overrides: Partial<CaseActivityEvent> = {}): CaseActivityEvent {
     cursor: 'c1',
     type: 'comment',
     actorUsername: 'someone',
+    actorDisplayName: 'someone',
     actorIsAi: false,
     sideUuid: null,
     sideName: null,

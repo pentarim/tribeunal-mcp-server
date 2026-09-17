@@ -92,6 +92,8 @@ export interface CaseActivityEvent {
   cursor: string;
   type: string;
   actorUsername: string;
+  /** The actor's persona full name when actorIsAi and not anonymized; identical to actorUsername otherwise (a human, or an anonymized juror). */
+  actorDisplayName: string;
   actorIsAi: boolean;
   sideUuid: string | null;
   sideName: string | null;
