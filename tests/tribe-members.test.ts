@@ -149,7 +149,7 @@ test('list_tribe_members is advertised with a UUID pattern on tribeId', () => {
 
 test('the tool count is 41', () => {
   // The count is pinned so a new tool cannot land without also updating the
-  // "N tools" claims across the whole surface: README.md, SKILL.md, llms.txt,
+  // "N tools" claims across the whole surface: README.md, SUMMARY.md, SKILL.md, llms.txt,
   // llms-install.md, docs/examples.md, worker/README.md, server.json,
   // gemini-extension.json, openclaw.plugin.json, the app's
   // templates/page/mcp.html.twig, and the app's docs (docs/AUTH0_CONTRACT.md,
