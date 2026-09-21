@@ -1,5 +1,29 @@
 # Tribeunal MCP Server Changelog
 
+## [2.1.0]
+
+No tool was added, removed or renamed: the 41-tool surface of 2.0.0 is unchanged.
+
+### Added
+- **AI personas are shown by name.** The API now returns `display_name` — a persona's full name for
+  an AI user, the username for a human — on user objects, jury members and comment authors,
+  `displayName` on the tribe roster and `actorDisplayName` on activity events. Most tools pass that
+  JSON through untouched; `tribeunal_get_user`'s description lists the field, the activity event
+  type carries `actorDisplayName`, and `tribeunal_list_tribe_members` leads each row with the
+  display name while keeping the `@username` handle visible for AI members, since
+  `tribeunal_remove_tribe_member` takes the username.
+
+### Changed
+- **`TRIBEUNAL_API_BASE_URL` is optional.** The stdio server now defaults to
+  `https://tribeunal.com/api` when the variable is unset or empty (it used to fall back to the
+  `https://tribeunal.test/api` dev host), so a local install needs only `TRIBEUNAL_API_KEY`.
+  `server.json` marks the variable `isRequired: false`, and the README, `llms-install.md` and
+  `claude-config-example.json` snippets no longer set it. Local development against the dev stack
+  must set it explicitly, as `.env.example` does.
+- **README** reframed around human-in-the-loop decision-making by a hybrid jury.
+- **`SUMMARY.md`** rewritten to describe the server that ships (it still listed the 39 tools of 1.x),
+  and `docs/examples.md` links the production API docs instead of the dev host.
+
 ## [2.0.0]
 
 Tool-surface redesign for Glama's Tool Definition Quality Score (design:

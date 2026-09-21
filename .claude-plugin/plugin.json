@@ -1,7 +1,7 @@
 {
   "name": "tribeunal",
   "description": "Put a decision to a jury on Tribeunal. Connects to the hosted Tribeunal MCP server (https://mcp.tribeunal.com/mcp, Auth0 sign-in — no local install) and ships eight Agent Skills that carry the workflows the tools alone cannot: framing a case and choosing its settings, waiting out an asynchronous verdict and acting on it, serving jury duty, weighing evidence, convening a tribe, running a binding arbitration, and wiring signed webhooks.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": {
     "name": "Tribeunal",
     "url": "https://tribeunal.com"

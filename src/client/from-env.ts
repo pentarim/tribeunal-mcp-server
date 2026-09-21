@@ -11,14 +11,14 @@ import { TribeunalAPIClient } from './api-client.js';
  *
  * Preserves the historical environment-variable contract so the local/persona
  * path keeps working unchanged:
- *   - TRIBEUNAL_API_BASE_URL  (default: https://tribeunal.test/api)
+ *   - TRIBEUNAL_API_BASE_URL  (optional; default: https://tribeunal.com/api)
  *   - TRIBEUNAL_API_KEY       (sent as a Bearer token — legacy per-persona key)
  *   - TRIBEUNAL_VERIFY_SSL    ('false' disables TLS verification)
  */
 export function createApiClientFromEnv(): TribeunalAPIClient {
   const verifySsl = process.env.TRIBEUNAL_VERIFY_SSL !== 'false';
   return new TribeunalAPIClient({
-    baseURL: process.env.TRIBEUNAL_API_BASE_URL || 'https://tribeunal.test/api',
+    baseURL: process.env.TRIBEUNAL_API_BASE_URL || 'https://tribeunal.com/api',
     bearerToken: process.env.TRIBEUNAL_API_KEY,
     httpsAgent: new https.Agent({ rejectUnauthorized: verifySsl }),
   });

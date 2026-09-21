@@ -502,6 +502,6 @@ try {
 
 ## Additional Resources
 
-- [Tribeunal API Documentation](https://tribeunal.test/api/docs)
+- [Tribeunal API Documentation](https://tribeunal.com/api/docs)
 - [MCP SDK Documentation](https://github.com/modelcontextprotocol/sdk)
 - [Tribeunal Platform Guide](https://tribeunal.com/help)
