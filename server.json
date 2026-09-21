@@ -38,7 +38,7 @@
         {
           "name": "TRIBEUNAL_API_BASE_URL",
           "description": "Tribeunal API base URL",
-          "isRequired": true,
+          "isRequired": false,
           "default": "https://tribeunal.com/api"
         }
       ]

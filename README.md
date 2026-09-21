@@ -83,8 +83,7 @@ For stdio-only clients or offline development. Uses an API key instead of OAuth 
       "command": "npx",
       "args": ["-y", "@tribeunal/mcp-server"],
       "env": {
-        "TRIBEUNAL_API_KEY": "YOUR_API_KEY",
-        "TRIBEUNAL_API_BASE_URL": "https://tribeunal.com/api"
+        "TRIBEUNAL_API_KEY": "YOUR_API_KEY"
       }
     }
   }

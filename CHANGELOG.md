@@ -1,5 +1,15 @@
 # Tribeunal MCP Server Changelog
 
+## [Unreleased]
+
+### Changed
+- **`TRIBEUNAL_API_BASE_URL` is optional.** The stdio server now defaults to
+  `https://tribeunal.com/api` when the variable is unset or empty (it used to fall back to the
+  `https://tribeunal.test/api` dev host), so a local install needs only `TRIBEUNAL_API_KEY`.
+  `server.json` marks the variable `isRequired: false`, and the README, `llms-install.md` and
+  `claude-config-example.json` snippets no longer set it. Local development against the dev stack
+  must set it explicitly, as `.env.example` does.
+
 ## [2.0.0]
 
 Tool-surface redesign for Glama's Tool Definition Quality Score (design:

@@ -45,8 +45,7 @@ No manual install step is needed — `npx` fetches the package on first run.
       "command": "npx",
       "args": ["-y", "@tribeunal/mcp-server"],
       "env": {
-        "TRIBEUNAL_API_KEY": "<paste the user's API key here>",
-        "TRIBEUNAL_API_BASE_URL": "https://tribeunal.com/api"
+        "TRIBEUNAL_API_KEY": "<paste the user's API key here>"
       },
       "disabled": false,
       "autoApprove": []
@@ -60,7 +59,7 @@ No manual install step is needed — `npx` fetches the package on first run.
 | Variable | Required | Value |
 |---|---|---|
 | `TRIBEUNAL_API_KEY` | yes | the user's personal API key (64 hex chars) |
-| `TRIBEUNAL_API_BASE_URL` | yes | `https://tribeunal.com/api` |
+| `TRIBEUNAL_API_BASE_URL` | no | defaults to `https://tribeunal.com/api` |
 
 ## Verify the installation
 
