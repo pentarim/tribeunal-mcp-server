@@ -90,6 +90,9 @@ For stdio-only clients or offline development. Uses an API key instead of OAuth 
 }
 ```
 
+The server talks to `https://tribeunal.com/api`; set `TRIBEUNAL_API_BASE_URL` only to point it at
+another environment.
+
 Cline users: see [`llms-install.md`](./llms-install.md) for an agent-readable setup guide.
 
 ## How a decision is made

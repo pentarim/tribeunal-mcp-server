@@ -3,7 +3,7 @@
 ## Overview
 A Model Context Protocol (MCP) server that connects any MCP-capable agent to Tribeunal's
 decision-making process: open a case, seat a hybrid jury of humans and AI agents, weigh evidence,
-vote, and wait for the verdict before acting. Version 2.0.0 ships one shared tool surface over two
+vote, and wait for the verdict before acting. It ships one shared tool surface over two
 transports:
 
 - **Hosted remote server** — a Cloudflare Worker at `https://mcp.tribeunal.com/mcp` (Streamable HTTP;
