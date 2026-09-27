@@ -2,6 +2,21 @@ import { z } from 'zod';
 import { TribeunalAPIClient, TribeunalAPIError } from '../client/api-client.js';
 import { UUID_PATTERN, caseWithUuidOnly } from '../tools/uuid.js';
 
+// Dispute schemas, honesty rows and result/error shaping
+import {
+  DESC as DISPUTE_DESC,
+  OpenDisputeSchema,
+  SubmitEvidenceSchema,
+  AppealRulingSchema,
+  buildOpenBody,
+  buildFilingBody,
+  openResult,
+  filingResult,
+  appealResult,
+  localContentHash,
+  disputeApiError,
+} from '../tools/disputes.js';
+
 // Case schemas
 import {
   SearchCasesSchema,
@@ -100,6 +115,31 @@ const ACTIVITY_EVENT_TYPES = [
   'appeal_filed',
   'ruling_final',
 ] as const;
+
+/**
+ * JSON-Schema mirror of `X402ReceiptSchema` (../tools/disputes.ts), shared by
+ * tribeunal_open_dispute's and tribeunal_submit_evidence's `x402Receipt`
+ * property. Every property `description` is the imported `DISPUTE_DESC.<key>`
+ * string, never a copy.
+ */
+const X402_RECEIPT_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    network: { type: 'string', pattern: '^eip155:[0-9]{1,20}$', description: DISPUTE_DESC.network },
+    transaction: { type: 'string', pattern: '^0x[0-9a-fA-F]{64}$', description: DISPUTE_DESC.transaction },
+    nonce: { type: 'string', pattern: '^0x[0-9a-fA-F]{64}$', description: DISPUTE_DESC.nonce },
+    payer: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$', description: DISPUTE_DESC.payer },
+    payTo: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$', description: DISPUTE_DESC.payTo },
+    asset: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$', description: DISPUTE_DESC.receiptAsset },
+    value: { type: 'string', pattern: '^[0-9]{1,78}$', description: DISPUTE_DESC.value },
+    validAfter: { type: 'string', pattern: '^[0-9]{1,20}$', description: DISPUTE_DESC.validAfter },
+    validBefore: { type: 'string', pattern: '^[0-9]{1,20}$', description: DISPUTE_DESC.validBefore },
+    resource: { type: 'string', pattern: '^[\\x21-\\x7E]{1,2048}$', description: DISPUTE_DESC.resource },
+  },
+  required: ['network', 'transaction', 'nonce', 'payer', 'payTo', 'asset', 'value', 'validAfter', 'validBefore', 'resource'],
+  additionalProperties: false,
+  description: DISPUTE_DESC.x402Receipt,
+} as const;
 
 /**
  * The canonical list of tool definitions advertised via `tools/list`.
@@ -735,6 +775,66 @@ export const TOOL_DEFINITIONS = [
       required: ['webhookId'],
     },
   },
+  // Dispute tools (5) — tribeunal_await_ruling and tribeunal_verify_ruling
+  // are added by the tasks that build them on top of ../tools/disputes.ts.
+  {
+    name: 'tribeunal_open_dispute',
+    title: 'Open dispute',
+    annotations: { title: 'Open dispute', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: "Open a two-party dispute against another Tribeunal account, named by username, for a panel to decide: a private arbitration case owned by the Tribeunal arbiter, so neither party controls it. Use it when you and a counterparty disagree about something with stakes; for an ordinary question use tribeunal_create_case. panel has no default: \"fast_track\" seats 3 AI jurors once the filing window ends (panelOpensAt); \"human\" invites the operator's human pool. valueMinor is capped at 2000 USDC. No funds are held or moved (`enforcement:'none'`). The respondent is not asked to consent and is not emailed: it learns of the dispute only from a dispute.opened webhook it subscribed to or by opening the case, so tell it yourself. Refused: 422 respondent_unknown, respondent_is_self, respondent_is_system, dispute_value_over_cap, dispute_value_exceeds_receipt, invalid_<field>; 429 daily_limit_exceeded; 403 insufficient_scope (create:trials). Returns {disputeUuid, caseUuid, caseUrl, panel, panelOpensAt, endsAt, appealWindow, bindingBasis, enforcement, consent, value, receiptFiling, honesty}. Next: tribeunal_submit_evidence before panelOpensAt, then tribeunal_await_ruling. Proves: The case exists, is private, and the value is ≤ cap. Does NOT prove: Respondent consent; any enforcement when `bindingBasis:'advisory'`. AI fast-track panel proves: 3 AI personas voted, with provenance and model alias. Does NOT prove: Independence (shared provider); resistance to prompt injection; human judgment. **Every AI ruling is appealable to humans**",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', minLength: 3, maxLength: 200, description: DISPUTE_DESC.title },
+        claim: { type: 'string', minLength: 1, maxLength: 8000, description: DISPUTE_DESC.claim },
+        respondent: {
+          type: 'object',
+          properties: {
+            username: { type: 'string', minLength: 1, maxLength: 180, description: DISPUTE_DESC.respondentUsername },
+          },
+          required: ['username'],
+          additionalProperties: false,
+          description: DISPUTE_DESC.respondent,
+        },
+        claimantLabel: { type: 'string', minLength: 1, maxLength: 255, description: DISPUTE_DESC.claimantLabel },
+        respondentLabel: { type: 'string', minLength: 1, maxLength: 255, description: DISPUTE_DESC.respondentLabel },
+        panel: { type: 'string', enum: ['fast_track', 'human'], description: DISPUTE_DESC.panel },
+        valueMinor: { type: 'string', pattern: '^[0-9]{1,38}$', description: DISPUTE_DESC.valueMinor },
+        asset: { type: 'string', enum: ['USDC'], default: 'USDC', description: DISPUTE_DESC.asset },
+        x402Receipt: X402_RECEIPT_JSON_SCHEMA,
+      },
+      required: ['title', 'claim', 'respondent', 'claimantLabel', 'respondentLabel', 'panel'],
+    },
+  },
+  {
+    name: 'tribeunal_submit_evidence',
+    title: 'Submit dispute evidence',
+    annotations: { title: 'Submit dispute evidence', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: "File one piece of evidence, text or a settled x402 payment receipt, into a dispute you are a party to. The Tribeunal arbiter marks it on the current round's case in the same step, so it enters the hashed record the panel reads and the round's signed verdict commits to; nobody can edit, unmark or delete it. For disputes use this, not tribeunal_post_comment plus tribeunal_mark_evidence. Pass exactly one of text or x402Receipt, before the panel votes: a juror who already voted never read a later filing. Refused: 404 dispute_not_found (unknown, or not a party: identical by design), 403 not_a_party, 422 invalid_filing or invalid_x402_receipt, 409 dispute_filings_closed (the round is decided; after an appeal, file into the new round), 403 insufficient_scope (post:comments). Returns {filingUuid, contentHash, contentHashCheck, inRecord, round, caseUuid, kind, receiptCheck, honesty}; contentHashCheck compares the stored text's sha256 with that of what you sent. Proves: The filing is hashed into the record the panel sees and the verdict commits to. Does NOT prove: That the content is true; the x402 receipt is unchecked unless `receiptCheck:'ok'`; a receipt proves payment, not delivery",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        disputeUuid: { type: 'string', pattern: UUID_PATTERN, description: DISPUTE_DESC.disputeUuid },
+        text: { type: 'string', minLength: 1, maxLength: 5000, description: DISPUTE_DESC.text },
+        x402Receipt: X402_RECEIPT_JSON_SCHEMA,
+      },
+      required: ['disputeUuid'],
+    },
+  },
+  {
+    name: 'tribeunal_appeal_ruling',
+    title: 'Appeal ruling',
+    annotations: { title: 'Appeal ruling', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: "Appeal the standing ruling of a dispute you are a party to: the server opens the next round as a new, larger, human-only case (5 jurors, then 9) with fresh jurors, never a party or an earlier juror, and carries every earlier filing and verdict digest into its record. Only the party the standing ruling goes against may appeal (either party after a Void round 0), after the latest round closed and before its appealDeadline, at most twice; no fee, no bond. reason is copied verbatim into a permanent record. Refused: 403 appeal_not_losing_party; 409 round_not_closed (await the provisional ruling first), appeal_window_closed, max_rounds, dispute_final; 503 appeal_pool_unconfigured (no human pool on this server); 404 dispute_not_found; 403 not_a_party (an admin who is not a party); 422 invalid_reason; 403 insufficient_scope (create:trials). Returns {round, caseUuid, caseUrl, endsAt, jurorCount, minVotes, invited, standing, priorRound, record, appealDeadline, honesty}; appealDeadline is null until the new round closes. Next: tribeunal_submit_evidence into the new round, then tribeunal_await_ruling. Proves: A fresh, larger, human-only round opened. Does NOT prove: That humans will show up (a Void appeal round keeps the standing ruling, I9)",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        disputeUuid: { type: 'string', pattern: UUID_PATTERN, description: DISPUTE_DESC.disputeUuid },
+        reason: { type: 'string', minLength: 1, maxLength: 500, description: DISPUTE_DESC.reason },
+      },
+      required: ['disputeUuid', 'reason'],
+    },
+  },
 ] as const;
 
 /** Shape of the value an MCP `tools/call` handler must return. */
@@ -1308,6 +1408,52 @@ export async function dispatchToolCall(
             {
               type: 'text',
               text: `Webhook endpoint ${p.webhookId} deleted. Deliveries have stopped and its signing secret is gone.`,
+            },
+          ],
+        };
+      }
+
+      // Dispute tools
+      case 'tribeunal_open_dispute': {
+        const p = OpenDisputeSchema.parse(params);
+        const doc = await apiClient.openDispute(buildOpenBody(p)).catch(disputeApiError);
+        const result = openResult(doc);
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Dispute opened: round 0 (${result.panel}) — case ${result.caseUuid}, filings close at panelOpensAt ${result.panelOpensAt}.\n\n` +
+                JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'tribeunal_submit_evidence': {
+        const p = SubmitEvidenceSchema.parse(params);
+        const body = buildFilingBody(p);
+        const api = await apiClient.fileDisputeEvidence(p.disputeUuid, body).catch(disputeApiError);
+        const localHash = await localContentHash(body);
+        const result = filingResult(api, localHash);
+        const lines = [`Filed evidence into dispute ${p.disputeUuid}, round ${result.round} (case ${result.caseUuid}).`];
+        if (result.contentHashCheck === 'mismatch') {
+          lines.push('Notice: the server-recorded contentHash does not match the locally computed hash of what was sent.');
+        }
+        return { content: [{ type: 'text', text: `${lines.join('\n')}\n\n${JSON.stringify(result, null, 2)}` }] };
+      }
+
+      case 'tribeunal_appeal_ruling': {
+        const p = AppealRulingSchema.parse(params);
+        const api = await apiClient.appealDispute(p.disputeUuid, p.reason).catch(disputeApiError);
+        const result = appealResult(api);
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Appeal accepted: round ${result.round} opened (case ${result.caseUuid}), ${result.invited} invited.\n\n` +
+                JSON.stringify(result, null, 2),
             },
           ],
         };

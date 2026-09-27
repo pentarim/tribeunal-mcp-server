@@ -138,6 +138,89 @@ export interface CaseActivityPage {
   verdict: CaseVerdict | null;
 }
 
+/** One round of a dispute — one child case per round (design spec §2.6). */
+export interface DisputeRound {
+  round: number;
+  caseUuid: string;
+  caseUrl: string;
+  state: string;
+  panelMode: 'ai' | 'human';
+  jurorCount: number;
+  minVotes: number;
+  panelOpensAt: string;
+  endsAt: string;
+  appealWindowSeconds: number;
+  filedBy: string | null;
+  decisionUuid: string | null;
+  ruling: 0 | 1 | 2 | null;
+  closedAt: string | null;
+  appealDeadline: string | null;
+}
+
+/** The standing (currently-controlling) ruling and the round it rests on. */
+export interface DisputeStanding {
+  ruling: 0 | 1 | 2;
+  basisRound: number;
+  basisDecisionUuid: string | null;
+}
+
+/** GET /api/disputes/{uuid} and the POST /api/disputes 201 body (design spec §2.6). */
+export interface DisputeDocument {
+  disputeUuid: string;
+  round0CaseUuid: string;
+  origin: 'offchain';
+  panel: 'fast_track' | 'human';
+  enforcement: 'none';
+  consent: 'claimant_only';
+  bindingBasis: 'advisory';
+  viewerRole: string;
+  value: { minor: string; asset: string; decimals: number };
+  valueCapMinor: string;
+  claimant: { username: string; label: string; sideUuid: string; wallet: string | null };
+  respondent: { username: string; label: string; sideUuid: string; wallet: string | null };
+  arbiter: { username: string };
+  rulingIndex: unknown;
+  rounds: DisputeRound[];
+  standing: DisputeStanding | null;
+  final: { at: string | null; ruling: 0 | 1 | 2 | null; decisionUuid: string | null };
+  receiptFiling: unknown;
+  createdAt: string;
+  honesty: unknown;
+}
+
+/** POST /api/disputes/{uuid}/filings 201 body. */
+export interface DisputeFilingResult {
+  filingUuid: string;
+  commentUuid: string;
+  caseUuid: string;
+  round: number;
+  kind: 'text' | 'x402-receipt';
+  contentHash: string;
+  markedBy: string;
+  receiptCheck: null | 'unchecked';
+  inRecord: true;
+}
+
+/** POST /api/disputes/{uuid}/appeals 201 body. */
+export interface DisputeAppealResult {
+  disputeUuid: string;
+  round: number;
+  caseUuid: string;
+  caseUrl: string;
+  filedBy: string;
+  panelMode: 'human';
+  jurorCount: number;
+  minVotes: number;
+  trialLength: number;
+  endsAt: string;
+  appealWindowSeconds: number;
+  priorRound: { round: number; caseUuid: string; decisionUuid: string | null; ruling: 0 | 1 | 2 | null };
+  standing: DisputeStanding;
+  record: { commentUuid: string; contentHash: string; type: string };
+  invited: number;
+  honesty: unknown;
+}
+
 export class TribeunalAPIClient {
   private client: AxiosInstance;
   private bearerToken: string | undefined;
@@ -554,6 +637,36 @@ export class TribeunalAPIClient {
     }
     const response = await this.client.post(`/evidence/${evidenceId}/rate`, body);
     return response.data;
+  }
+
+  // Dispute endpoints (design spec 2026-09-26-agent-dispute-tools §2.6, §3.1).
+  // Every route is under /api like createCase — none uses baseOrigin.
+
+  /** POST /api/disputes — opens a two-party dispute; body per tools/disputes.ts buildOpenBody(). */
+  async openDispute(body: Record<string, unknown>): Promise<DisputeDocument> {
+    const response = await this.client.post('/disputes', body);
+    return response.data as DisputeDocument;
+  }
+
+  /** GET /api/disputes/{uuid} — the current dispute document; 404 dispute_not_found masks both an unknown uuid and a non-party viewer. */
+  async getDispute(uuid: string): Promise<DisputeDocument> {
+    const response = await this.client.get(`/disputes/${uuid}`);
+    return response.data as DisputeDocument;
+  }
+
+  /** POST /api/disputes/{uuid}/filings — {text} xor {x402Receipt}; the arbiter marks it in the same step. */
+  async fileDisputeEvidence(
+    uuid: string,
+    body: { text: string } | { x402Receipt: unknown },
+  ): Promise<DisputeFilingResult> {
+    const response = await this.client.post(`/disputes/${uuid}/filings`, body);
+    return response.data as DisputeFilingResult;
+  }
+
+  /** POST /api/disputes/{uuid}/appeals — {reason}; the calling account appeals as the party itself. */
+  async appealDispute(uuid: string, reason: string): Promise<DisputeAppealResult> {
+    const response = await this.client.post(`/disputes/${uuid}/appeals`, { reason });
+    return response.data as DisputeAppealResult;
   }
 }
 
