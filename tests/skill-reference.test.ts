@@ -87,3 +87,24 @@ test('the plugin manifest version tracks the package version', () => {
   assert.equal(marketplace.plugins[0].name, 'tribeunal');
   assert.equal(marketplace.plugins[0].version, pkg.version, 'the marketplace entry must equal package.json');
 });
+
+test('every server constructor and manifest carries the 2.2.0 package version', () => {
+  // The nine literals a version bump must touch by hand (spec §2.1). The two
+  // Server constructors (stdio, worker) are source-read because neither entry
+  // point is importable here, and they went untested through three stale bumps.
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.version, '2.2.0');
+
+  for (const path of ['../src/index.ts', '../worker/src/mcp-agent.ts']) {
+    const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+    assert.match(source, /version:\s*'2\.2\.0'/, `${path} must construct its Server with version: '2.2.0'`);
+  }
+
+  const server = JSON.parse(readFileSync(new URL('../server.json', import.meta.url), 'utf8'));
+  assert.equal(server.version, '2.2.0', 'server.json top-level version must equal package.json');
+  assert.equal(
+    server.packages?.[0]?.version,
+    '2.2.0',
+    'server.json packages[0].version must equal package.json',
+  );
+});

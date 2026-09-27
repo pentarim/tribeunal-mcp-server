@@ -23,6 +23,7 @@ test('the instructions name the facts an agent otherwise gets wrong', () => {
   assert.match(SERVER_INSTRUCTIONS, /tribeunal_await_verdict/, 'verdicts are asynchronous');
   assert.match(SERVER_INSTRUCTIONS, /shareUrl/, 'a private case url is a login wall / access-denied dead end for everyone else');
   assert.match(SERVER_INSTRUCTIONS, /using-tribeunal/, 'the handshake must point at the skills');
+  assert.match(SERVER_INSTRUCTIONS, /tribeunal_verify_ruling/, 'arbitration verdicts are signed and verifiable');
 });
 
 test('both transports pass the same instructions to their constructor', () => {

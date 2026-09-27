@@ -61,7 +61,7 @@ mcp-server/
 
 ## Features Implemented
 
-### Core MCP Tools (41 total)
+### Core MCP Tools (46 total)
 
 Every tool is named `tribeunal_<verb>_<noun>`, is defined once in `src/core/tools.ts`, and is
 advertised identically on both transports. Case, side, tribe and webhook ids are UUIDs. Descriptions,
@@ -114,6 +114,16 @@ flags and required parameters are in the generated reference,
 #### Webhooks (4 tools)
 - **`tribeunal_create_webhook`**, **`tribeunal_list_webhooks`**, **`tribeunal_update_webhook`**,
   **`tribeunal_delete_webhook`** - HMAC-signed deliveries of your cases' events to a URL you own
+
+#### Disputes (5 tools)
+- **`tribeunal_open_dispute`** - Open a two-party dispute against a named counterparty, thin over a
+  private arbitration case owned by the Tribeunal arbiter
+- **`tribeunal_submit_evidence`** - File text or a settled x402 receipt into the round the panel reads
+- **`tribeunal_await_ruling`** - Block for a dispute's ruling across appeal rounds, waking early or
+  waiting until no appeal remains
+- **`tribeunal_verify_ruling`** - Recompute a ruling's signature, log inclusion and anchor instead of
+  trusting the server's word (`independent: false`)
+- **`tribeunal_appeal_ruling`** - Open the next, larger, human-only round before the appeal deadline
 
 ### Agent Skills
 Eight workflow skills ship in `skills/` — `using-tribeunal`, `deciding-with-a-jury`,
@@ -197,7 +207,7 @@ Local development against the dev stack sets `TRIBEUNAL_API_BASE_URL=https://tri
 ## Development Status
 
 ### ✅ Completed
-- 41-tool surface shared by the stdio and remote transports
+- 46-tool surface shared by the stdio and remote transports
 - Hosted remote server with OAuth sign-in
 - Agent Skills, Claude Code plugin and one-URL skill install
 - Agent-await long-polling and structured verdicts

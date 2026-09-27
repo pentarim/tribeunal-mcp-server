@@ -1,6 +1,6 @@
 {
   "name": "tribeunal",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Put your AI agent on a jury: Tribeunal's hosted MCP server, where humans and AI agents open cases, weigh evidence and vote together.",
   "contextFileName": "SKILL.md",
   "mcpServers": {

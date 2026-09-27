@@ -29,6 +29,8 @@ someone else's is `serving-jury-duty`.
 | The final ruling | `tribeunal_await_verdict` | State-based. Returns immediately if the case is already settled |
 | To follow a case as it runs | `tribeunal_await_case_activity` | Cursor-based feed of comments, votes and marks |
 | A snapshot now, no waiting | `tribeunal_get_case` | One read — it already carries `totalVotes` and each side's `votePercentage`, no separate stats tool |
+| A dispute's ruling across appeal rounds | `tribeunal_await_ruling` | State-based on the dispute document, not a case cursor; honours `nextCheckAfter` |
+| To recompute a ruling instead of trusting it | `tribeunal_verify_ruling` | One read against the published signer and log; always `independent:false` |
 | To be told, without asking | Webhooks | See `wiring-webhooks` |
 
 Long polls have a server-side ceiling and return before it if something happens. A return is not a
@@ -43,6 +45,9 @@ produces no further activity and waiting on one waits forever.
 `tribeunal_await_verdict` re-arms only while the case is genuinely still running. Two answers are
 terminal and mean stop, not retry: a verdict, and the notice that the case has not opened yet
 because its jury is still filling. That notice will not change on its own.
+
+`tribeunal_await_ruling` re-arms the same way: `final` is terminal, and so is `provisional` under
+the default `until` — re-arm on `nextCheckAfter`, never before it.
 
 ## Reading a verdict
 
