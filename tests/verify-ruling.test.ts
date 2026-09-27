@@ -737,7 +737,7 @@ test('a bundleUrl on a foreign host is refused before any client call', async ()
 });
 
 test('rpcUrl must be https, or http on localhost/127.0.0.1', async () => {
-  const { client } = fakeVerifyClient({ bundle: published() });
+  const { client } = fakeVerifyClient({ bundle: published(), anchor: null });
   await assert.rejects(
     () => dispatchToolCall(client, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID, rpcUrl: 'http://example.com/' }),
     (err: Error) => {
@@ -746,8 +746,12 @@ test('rpcUrl must be https, or http on localhost/127.0.0.1', async () => {
       return true;
     },
   );
-  await assert.doesNotReject(() =>
-    dispatchToolCall(client, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID, rpcUrl: 'http://127.0.0.1:8545/' }),
+  const res = await dispatchToolCall(client, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID, rpcUrl: 'http://127.0.0.1:8545/' });
+  const { result } = jsonAfterHeadline(res.content[0].text);
+  assert.equal(
+    byName(result.checks as CheckResult[], 'anchor').result,
+    'n/a',
+    'a null anchor well-known short-circuits before rpcCall — no fetch to 127.0.0.1:8545',
   );
 });
 
@@ -779,11 +783,16 @@ test('command names the online form for a public ruling, with --rpc when given',
   const { result } = jsonAfterHeadline((await dispatchToolCall(client, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID })).content[0].text);
   assert.equal(result.command, `node tools/ruling-verify.mjs https://tribeunal.test/api/rulings/${DECISION_UUID}`);
 
-  const { client: client2 } = fakeVerifyClient({ bundle: withVisibility(published(), 'public') });
+  const { client: client2 } = fakeVerifyClient({ bundle: withVisibility(published(), 'public'), anchor: null });
   const { result: result2 } = jsonAfterHeadline(
     (await dispatchToolCall(client2, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID, rpcUrl: 'https://rpc.example/' })).content[0].text,
   );
   assert.equal(result2.command, `node tools/ruling-verify.mjs https://tribeunal.test/api/rulings/${DECISION_UUID} --rpc https://rpc.example/`);
+  assert.equal(
+    byName(result2.checks as CheckResult[], 'anchor').result,
+    'n/a',
+    'a null anchor well-known short-circuits before rpcCall — no fetch to rpc.example',
+  );
 });
 
 test('command names the offline form for a private ruling (every dispute round today)', async () => {
