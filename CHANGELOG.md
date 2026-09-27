@@ -27,15 +27,15 @@ against an older one they answer 404.
   never a party or an earlier juror, and carries every earlier filing and verdict digest into its
   record. Proves: A fresh, larger, human-only round opened. Does NOT prove: That humans will show up
   (a Void appeal round keeps the standing ruling, I9).
-- **`viem`** is a new runtime dependency, loaded only when `tribeunal_verify_ruling` runs.
+- `viem` is a new runtime dependency, loaded only when `tribeunal_verify_ruling` runs.
 - Six catalog names: webhooks gain `dispute.opened`, `appeal.filed`, `ruling.final`; activity types
   gain `dispute_opened`, `appeal_filed`, `ruling_final`.
 
 ### Changed
 - **Server instructions** now say arbitration verdicts are signed and point at
   `tribeunal_verify_ruling`, and shorten the private-case sentence to make room.
-- **`tribeunal_create_webhook`**'s owner-scope sentence now includes the dispute events a party
-  (never a bystander) may subscribe to.
+- **`tribeunal_create_webhook`**'s "Events are owner-scoped" sentence now names the dispute events a party
+  (never a bystander) receives.
 - **`tribeunal_cast_vote`** and **`tribeunal_join_jury`** name two new refusals, `dispute_party` and
   `dispute_prior_juror`, that block a dispute's parties and its earlier-round jurors from a later
   round's case.

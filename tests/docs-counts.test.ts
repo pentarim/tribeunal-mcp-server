@@ -85,3 +85,18 @@ test('CHANGELOG.md opens with the 2.2.0 release', () => {
   const firstRelease = text.split('\n').find((line) => /^## \[/.test(line));
   assert.equal(firstRelease, '## [2.2.0]', 'the newest release section must be 2.2.0');
 });
+
+test('CHANGELOG.md 2.2.0 notes match the spec byte-exactly', () => {
+  const text = read('CHANGELOG.md');
+  assert.ok(
+    text.includes('- `viem` is a new runtime dependency, loaded only when `tribeunal_verify_ruling` runs.'),
+    'the viem bullet must not wrap the backticks in bold markers',
+  );
+  assert.ok(
+    text.includes(
+      '- **`tribeunal_create_webhook`**\'s "Events are owner-scoped" sentence now names the dispute events a party\n' +
+        '  (never a bystander) receives.',
+    ),
+    'the webhook Changed bullet must name the "Events are owner-scoped" sentence',
+  );
+});
