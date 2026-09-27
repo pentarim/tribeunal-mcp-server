@@ -17,6 +17,9 @@ export const WEBHOOK_EVENTS = [
   'evidence.unmarked',
   'jury.joined',
   'ping',
+  'dispute.opened',
+  'appeal.filed',
+  'ruling.final',
 ] as const;
 
 // The URL is checked again server-side (and once more at delivery): it must be an
@@ -33,7 +36,7 @@ export const CreateWebhookSchema = z.object({
   events: z
     .array(z.enum(WEBHOOK_EVENTS))
     .min(1)
-    .describe("One or more of case.opened, case.closed, vote.cast, vote.revoked, comment.created, evidence.marked, evidence.unmarked, jury.joined, ping; an unknown name answers 400 invalid_events. 'ping' fires only when the endpoint is pinged from the web dashboard or API — no MCP tool sends it."),
+    .describe("One or more of case.opened, case.closed, vote.cast, vote.revoked, comment.created, evidence.marked, evidence.unmarked, jury.joined, ping, dispute.opened, appeal.filed, ruling.final; an unknown name answers 400 invalid_events. 'ping' fires only when the endpoint is pinged from the web dashboard or API — no MCP tool sends it."),
 });
 
 export const ListWebhooksSchema = z.object({});

@@ -11,7 +11,7 @@ import type { CaseActivityPage, TribeunalAPIClient } from '../client/api-client.
 // returns either the awaited change or a `timedOut` result the agent re-arms.
 
 /** Activity types the feed emits — mirrors the backend TrialActivity::TYPES. */
-const ACTIVITY_TYPES = [
+export const ACTIVITY_TYPES = [
   'vote',
   'vote_revoked',
   'comment',
@@ -22,6 +22,9 @@ const ACTIVITY_TYPES = [
   'trial_closed',
   'trial_reopened',
   'trial_updated',
+  'dispute_opened',
+  'appeal_filed',
+  'ruling_final',
 ] as const;
 
 export const GetCaseActivitySchema = z.object({
@@ -33,7 +36,7 @@ export const GetCaseActivitySchema = z.object({
   types: z
     .array(z.enum(ACTIVITY_TYPES))
     .optional()
-    .describe('Restrict to these event types (vote, vote_revoked, comment, evidence_marked, evidence_unmarked, jury_joined, jury_left, trial_closed, trial_reopened, trial_updated); omit for all types.'),
+    .describe('Restrict to these event types (vote, vote_revoked, comment, evidence_marked, evidence_unmarked, jury_joined, jury_left, trial_closed, trial_reopened, trial_updated, dispute_opened, appeal_filed, ruling_final); omit for all types.'),
   limit: z.number().int().min(1).max(100).optional().describe('Max events per page, 1-100; defaults to 50.'),
 });
 

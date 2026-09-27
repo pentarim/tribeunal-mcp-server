@@ -96,6 +96,9 @@ const ACTIVITY_EVENT_TYPES = [
   'trial_closed',
   'trial_reopened',
   'trial_updated',
+  'dispute_opened',
+  'appeal_filed',
+  'ruling_final',
 ] as const;
 
 /**
@@ -259,7 +262,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: { type: 'string', pattern: UUID_PATTERN, description: 'Case UUID whose activity to read.' },
         after: { type: 'string', description: "Opaque cursor from a previous response's latestCursor; omit to read the tail (latest events)." },
-        types: { type: 'array', items: { type: 'string', enum: [...ACTIVITY_EVENT_TYPES] }, description: 'Restrict to these event types (vote, vote_revoked, comment, evidence_marked, evidence_unmarked, jury_joined, jury_left, trial_closed, trial_reopened, trial_updated); omit for all types.' },
+        types: { type: 'array', items: { type: 'string', enum: [...ACTIVITY_EVENT_TYPES] }, description: 'Restrict to these event types (vote, vote_revoked, comment, evidence_marked, evidence_unmarked, jury_joined, jury_left, trial_closed, trial_reopened, trial_updated, dispute_opened, appeal_filed, ruling_final); omit for all types.' },
         limit: { type: 'integer', minimum: 1, maximum: 100, default: 50, description: 'Max events per page, 1-100; defaults to 50.' },
       },
       required: ['caseId'],
@@ -286,7 +289,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_cast_vote',
     title: 'Cast vote',
     annotations: { title: 'Cast vote', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: 'Cast your vote on a case for a side (uuid from tribeunal_get_case); an optional comment shows in the activity feed, markable as evidence. One vote per case — vote again with a different side to change it, or tribeunal_revoke_vote to remove it. Refused: 400 voting_closed (deadline passed or not open), 400 not_invited (seat first with tribeunal_join_jury), 400 ai_juror_limit, 400 tag_access_required (no free votes left), 403 arbitration_owner (you own it). Returns {vote_id, trial_id, side_id, comment_id}.',
+    description: 'Cast your vote on a case for a side (uuid from tribeunal_get_case); an optional comment shows in the activity feed, markable as evidence. One vote per case — vote again with a different side to change it, or tribeunal_revoke_vote to remove it. Refused: 400 voting_closed (deadline passed or not open), 400 not_invited (seat first with tribeunal_join_jury), 400 ai_juror_limit, 400 tag_access_required (no free votes left), 403 arbitration_owner (you own it), 403 dispute_party (you are a party to this dispute), 403 dispute_prior_juror (you sat on an earlier round). Returns {vote_id, trial_id, side_id, comment_id}.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -450,7 +453,7 @@ export const TOOL_DEFINITIONS = [
     title: 'Join a case jury',
     annotations: { title: 'Join a case jury', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     description:
-      "Seat yourself on a case's jury. Use when invited to an invited-jury case, or a wait-mode case needs jurors — public juries need no seat, vote directly with `tribeunal_cast_vote`. The server does not check the invite list — never join a jury you were not invited to. One case only: `tribeunal_join_tribe` joins a standing group; `tribeunal_invite_jurors`'s `tribeId` recruits a whole tribe. Refused 400 if closed, already seated, or no slot remains; 403 `arbitration_owner` blocks the case owner. Leave with `tribeunal_leave_jury` (refused once you've voted). Returns {success, message}.",
+      "Seat yourself on a case's jury. Use when invited to an invited-jury case, or a wait-mode case needs jurors — public juries need no seat, vote directly with `tribeunal_cast_vote`. The server does not check the invite list — never join a jury you were not invited to. One case only: `tribeunal_join_tribe` joins a standing group; `tribeunal_invite_jurors`'s `tribeId` recruits a whole tribe. Refused 400 if closed, already seated, or no slot remains; 403 `arbitration_owner` blocks the case owner; 403 `dispute_party` and `dispute_prior_juror` block parties and earlier-round jurors of a dispute. Leave with `tribeunal_leave_jury` (refused once you've voted). Returns {success, message}.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -677,7 +680,7 @@ export const TOOL_DEFINITIONS = [
     name: 'tribeunal_create_webhook',
     title: 'Create webhook',
     annotations: { title: 'Create webhook', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: 'Register a URL that Tribeunal will POST your cases\' events to. Events are owner-scoped: an endpoint receives events only for cases YOU own. The response contains a signing secret shown ONLY once — store it, then verify each delivery as hmac_sha256(secret, "{X-Tribeunal-Timestamp}.{raw body}") against the hex in X-Tribeunal-Signature (format "v1=<hex>"). Deliveries retry 3 times with backoff and are at-least-once, so deduplicate on X-Tribeunal-Delivery. The URL must be absolute https and must not resolve to a private, loopback, link-local or CGNAT address. An 11th endpoint answers 409 endpoint_limit (cap: 10 per account). Change events or pause delivery with tribeunal_update_webhook; the URL and secret cannot be changed — delete with tribeunal_delete_webhook and re-create instead. Returns {uuid, url, events, active, secret} — secret appears here and nowhere else.',
+    description: 'Register a URL that Tribeunal will POST your cases\' events to. Events are owner-scoped: an endpoint receives events for cases YOU own, and, for a dispute you are a party to, dispute.opened, comment.created, evidence.marked, case.closed, appeal.filed and ruling.final (never votes or jury events). The response contains a signing secret shown ONLY once — store it, then verify each delivery as hmac_sha256(secret, "{X-Tribeunal-Timestamp}.{raw body}") against the hex in X-Tribeunal-Signature (format "v1=<hex>"). Deliveries retry 3 times with backoff and are at-least-once, so deduplicate on X-Tribeunal-Delivery. The URL must be absolute https and must not resolve to a private, loopback, link-local or CGNAT address. An 11th endpoint answers 409 endpoint_limit (cap: 10 per account). Change events or pause delivery with tribeunal_update_webhook; the URL and secret cannot be changed — delete with tribeunal_delete_webhook and re-create instead. Returns {uuid, url, events, active, secret} — secret appears here and nowhere else.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -686,7 +689,7 @@ export const TOOL_DEFINITIONS = [
           type: 'array',
           items: { type: 'string', enum: [...WEBHOOK_EVENTS] },
           minItems: 1,
-          description: "One or more of case.opened, case.closed, vote.cast, vote.revoked, comment.created, evidence.marked, evidence.unmarked, jury.joined, ping; an unknown name answers 400 invalid_events. 'ping' fires only when the endpoint is pinged from the web dashboard or API — no MCP tool sends it.",
+          description: "One or more of case.opened, case.closed, vote.cast, vote.revoked, comment.created, evidence.marked, evidence.unmarked, jury.joined, ping, dispute.opened, appeal.filed, ruling.final; an unknown name answers 400 invalid_events. 'ping' fires only when the endpoint is pinged from the web dashboard or API — no MCP tool sends it.",
         },
       },
       required: ['url', 'events'],

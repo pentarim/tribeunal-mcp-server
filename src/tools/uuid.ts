@@ -18,13 +18,23 @@ export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
-function uuidMessage(kind: 'case' | 'side' | 'tribe' | 'webhook' | 'evidence'): string {
+function uuidMessage(kind: 'case' | 'side' | 'tribe' | 'webhook' | 'evidence' | 'dispute'): string {
   return `Must be a ${kind} UUID (the ${kind}'s "uuid" field, e.g. 8415a252-5e41-4db6-bd5d-ee5b5ad95dd4) — not a numeric id, slug, or name.`;
 }
 
 /** A zod string constrained to the UUID form, carrying the given description. */
 export function caseUuid(description: string) {
   return z.string().regex(UUID_RE, uuidMessage('case')).describe(description);
+}
+
+/**
+ * A zod string constrained to the UUID form, for a dispute identifier.
+ * `dispute.id` is a uuid-typed column, so a case uuid or any other
+ * non-dispute UUID reaches the dispute routes and 404s as `dispute_not_found`
+ * rather than telling the model which field to use.
+ */
+export function disputeUuid(description: string) {
+  return z.string().regex(UUID_RE, uuidMessage('dispute')).describe(description);
 }
 
 /** A zod string constrained to the UUID form, for a side identifier. */
