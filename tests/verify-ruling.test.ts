@@ -638,6 +638,7 @@ test('import hygiene: no file other than src/core/tools.ts imports ../verify/rul
 test('src/core/tools.ts reaches the verifier only via a dynamic import, never a static one', () => {
   const text = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'core', 'tools.ts'), 'utf8');
   assert.match(text, /await import\('\.\.\/verify\/ruling-verifier\.js'\)/, 'tools.ts must lazily import the verifier');
+  assert.ok(text.includes("await import('../verify/ruling-verifier.js')"), 'tools.ts must lazily import the verifier');
   assert.doesNotMatch(
     text,
     /^import\s[^;]*from\s+['"]\.\.\/verify\/ruling-verifier\.js['"]/m,
@@ -739,7 +740,11 @@ test('rpcUrl must be https, or http on localhost/127.0.0.1', async () => {
   const { client } = fakeVerifyClient({ bundle: published() });
   await assert.rejects(
     () => dispatchToolCall(client, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID, rpcUrl: 'http://example.com/' }),
-    /Invalid parameters:.*rpcUrl must be https \(or http on localhost\)/,
+    (err: Error) => {
+      assert.ok(err.message.startsWith('Invalid parameters:'));
+      assert.ok(err.message.includes('rpcUrl must be https (or http on localhost)'));
+      return true;
+    },
   );
   await assert.doesNotReject(() =>
     dispatchToolCall(client, 'tribeunal_verify_ruling', { decisionUuid: DECISION_UUID, rpcUrl: 'http://127.0.0.1:8545/' }),
