@@ -357,6 +357,9 @@ function stubRuling(overrides: Partial<RulingRecord> = {}): RulingRecord {
   };
 }
 
+const DISPUTE_OK_DETAIL_BASE =
+  'app-served, unsigned block: consistent with itself and the signed verdict, not checked against a chain';
+
 function stubRound(overrides: Partial<RulingDisputeRound> = {}): RulingDisputeRound {
   return {
     round: 0,
@@ -414,7 +417,7 @@ test('dispute: a consistent single round -> ok, detail ends with the fixed sente
   };
   const check = await disputeResult(dispute, ruling);
   assert.equal(check.result, 'ok');
-  assert.match(check.detail, /app-served, unsigned block: consistent with itself and the signed verdict, not checked against a chain/);
+  assert.equal(check.detail, DISPUTE_OK_DETAIL_BASE);
 });
 
 test('dispute: rounds[1].round = 2 -> FAIL', async () => {
@@ -497,6 +500,37 @@ test('dispute: closedAt one second off the signed verdict.decidedAt -> FAIL', as
   assert.equal((await disputeResult(dispute, ruling)).result, 'FAIL');
 });
 
+test('dispute: closedAt null against a set signed verdict.decidedAt -> FAIL', async () => {
+  const canonicalJson = JSON.stringify({ verdict: { decided: true, decidedAt: '2026-01-01T00:00:00Z', sides: [{ isWinner: true }] } });
+  const ruling = stubRuling({ canonicalJson, canonicalJsonStatus: 'served', digest: 'irrelevant-for-this-check'.padEnd(64, '0') });
+  const round0 = stubRound({
+    round: 0,
+    caseUuid: ruling.caseUuid,
+    decisionUuid: ruling.decisionUuid,
+    digest: ruling.digest,
+    outcome: 'decided',
+    ruling: 1,
+    closedAt: null,
+  });
+  const dispute = {
+    disputeUuid: 'd', origin: 'offchain', enforcement: 'none', consent: 'claimant_only', bindingBasis: 'advisory',
+    round: 0, rounds: [round0], standingRuling: 1, basisDecisionUuid: ruling.decisionUuid,
+    final: false, finalAt: null, finalRuling: null, finalDecisionUuid: null, basis: 'app-window', execution: null,
+  };
+  assert.equal((await disputeResult(dispute, ruling)).result, 'FAIL');
+});
+
+test('dispute: an empty closed prefix (rounds[0].ruling null) with standingRuling/basisDecisionUuid set -> FAIL', async () => {
+  const ruling = stubRuling();
+  const round0 = stubRound({ round: 0, caseUuid: ruling.caseUuid, decisionUuid: ruling.decisionUuid, digest: ruling.digest, outcome: null, ruling: null });
+  const dispute = {
+    disputeUuid: 'd', origin: 'offchain', enforcement: 'none', consent: 'claimant_only', bindingBasis: 'advisory',
+    round: 0, rounds: [round0], standingRuling: 2, basisDecisionUuid: null,
+    final: false, finalAt: null, finalRuling: null, finalDecisionUuid: null, basis: 'app-window', execution: null,
+  };
+  assert.equal((await disputeResult(dispute, ruling)).result, 'FAIL');
+});
+
 test('dispute: outcome "decided" with ruling 0 -> FAIL', async () => {
   const ruling = stubRuling();
   const round0 = stubRound({ round: 0, caseUuid: ruling.caseUuid, decisionUuid: ruling.decisionUuid, digest: ruling.digest, outcome: 'decided', ruling: 0 });
@@ -519,7 +553,8 @@ test('dispute: a non-null execution is named in detail, verdict unchanged', asyn
   };
   const check = await disputeResult(dispute, ruling);
   assert.equal(check.result, 'ok');
-  assert.match(check.detail, /execution/);
+  assert.equal(check.detail, `execution: ${JSON.stringify({ txHash: '0xdeadbeef' })}; ${DISPUTE_OK_DETAIL_BASE}`);
+  assert.equal(check.detail.endsWith(DISPUTE_OK_DETAIL_BASE), true);
 });
 
 // ---------------------------------------------------------------------------

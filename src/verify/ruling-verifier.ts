@@ -967,8 +967,12 @@ function checkDispute(ruling: RulingRecord, dispute: RulingDisputeBlock | null |
     if (('decided' === row.outcome) !== verdictDecided) {
       throw new Error("the current round's outcome disagrees with the signed verdict's decided/isWinner");
     }
-    if (null !== row.closedAt && null != verdict.decidedAt) {
-      if (new Date(row.closedAt).getTime() !== new Date(verdict.decidedAt).getTime()) {
+    const decidedAt = verdict.decidedAt ?? null;
+    if ((null === row.closedAt) !== (null === decidedAt)) {
+      throw new Error("the current round's closedAt differs from the signed verdict's decidedAt");
+    }
+    if (null !== row.closedAt && null !== decidedAt) {
+      if (new Date(row.closedAt).getTime() !== new Date(decidedAt).getTime()) {
         throw new Error("the current round's closedAt differs from the signed verdict's decidedAt");
       }
     }
@@ -999,8 +1003,13 @@ function checkDispute(ruling: RulingRecord, dispute: RulingDisputeBlock | null |
         throw new Error('finalRuling/finalDecisionUuid disagree with the standing ruling and its basis');
       }
     }
-  } else if (dispute.final) {
-    throw new Error('final is true but no round has closed');
+  } else {
+    if (null !== dispute.standingRuling || null !== dispute.basisDecisionUuid) {
+      throw new Error('an empty closed prefix disagrees with standingRuling/basisDecisionUuid');
+    }
+    if (dispute.final) {
+      throw new Error('final is true but no round has closed');
+    }
   }
 
   if (!dispute.final && (null !== dispute.finalAt || null !== dispute.finalRuling || null !== dispute.finalDecisionUuid)) {
@@ -1015,7 +1024,7 @@ const DISPUTE_OK_DETAIL_BASE =
 
 function disputeOkDetail(dispute: RulingDisputeBlock | null | undefined): string {
   if (dispute && null !== dispute.execution && undefined !== dispute.execution) {
-    return `${DISPUTE_OK_DETAIL_BASE}; execution: ${JSON.stringify(dispute.execution)}`;
+    return `execution: ${JSON.stringify(dispute.execution)}; ${DISPUTE_OK_DETAIL_BASE}`;
   }
 
   return DISPUTE_OK_DETAIL_BASE;
