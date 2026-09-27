@@ -693,5 +693,28 @@ export class TribeunalAPIClient {
   rulingBundleUrl(uuid: string): string {
     return `${this.baseURL}/rulings/${uuid}`;
   }
+
+  /**
+   * GET {origin}{path} — a well-known document on this client's own host
+   * (e.g. `/.well-known/tribeunal-verdict-signer`). Absolute, so it bypasses
+   * the `/api` baseURL like the vote/join routes do. Tolerant: ANY failure
+   * (404, network error, malformed body) becomes `null`, never a throw —
+   * `tribeunal_verify_ruling` treats a missing well-known as `n/a`, not FAIL.
+   */
+  async getWellKnown(path: string, kind: 'json' | 'text'): Promise<unknown | null> {
+    try {
+      const response = await this.client.get(`${this.baseOrigin}${path}`, {
+        responseType: kind === 'text' ? 'text' : 'json',
+      });
+      return response.data;
+    } catch {
+      return null;
+    }
+  }
+
+  /** This client's own host (e.g. https://tribeunal.test) — never sent credentials beyond it. */
+  get origin(): string {
+    return this.baseOrigin;
+  }
 }
 

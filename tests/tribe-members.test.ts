@@ -147,7 +147,7 @@ test('list_tribe_members is advertised with a UUID pattern on tribeId', () => {
   assert.deepEqual(props.required, ['tribeId']);
 });
 
-test('the tool count is 45', () => {
+test('the tool count is 46', () => {
   // The count is pinned so a new tool cannot land without also updating the
   // "N tools" claims across the whole surface: README.md, SUMMARY.md, SKILL.md, llms.txt,
   // llms-install.md, docs/examples.md, worker/README.md, server.json,
@@ -167,9 +167,8 @@ test('the tool count is 45', () => {
   // tribeunal_remove_tribe_member, tribeunal_update_webhook (9 new).
   // 41 -> 44 by the three dispute write tools (tribeunal_open_dispute,
   // tribeunal_submit_evidence, tribeunal_appeal_ruling); 44 -> 45 by
-  // tribeunal_await_ruling; tribeunal_verify_ruling lands in a later task,
-  // moving this to 46.
-  assert.equal(TOOL_DEFINITIONS.length, 45, 'the shared tool count is 45');
+  // tribeunal_await_ruling; 41 -> 46 by the five dispute tools, 2.2.0.
+  assert.equal(TOOL_DEFINITIONS.length, 46, 'the shared tool count is 46');
   assert.ok(TOOL_DEFINITIONS.find((d) => d.name === 'tribeunal_list_tribe_members'));
 });
 

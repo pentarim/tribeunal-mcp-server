@@ -19,11 +19,10 @@ import { TribeunalAPIError, type TribeunalAPIClient } from '../src/client/api-cl
 /**
  * design spec 2026-09-26-agent-dispute-tools §8.1 `tests/disputes.test.ts`.
  * Plan Task 2 wired the three write tools (open, submit, appeal); Task 3
- * (`tests/await-ruling.test.ts`) wires tribeunal_await_ruling and adds its
- * inputSchema row below. Only tribeunal_verify_ruling's row is still checked
- * against its zod schema directly (its TOOL_DEFINITIONS entry lands in
- * Task 5, at which point the schema it already satisfies here is the same
- * one the new dispatch case parses with).
+ * (`tests/await-ruling.test.ts`) wired tribeunal_await_ruling; Task 5 wires
+ * tribeunal_verify_ruling (dispatch itself, and its dedicated fixtures, are
+ * `tests/verify-ruling.test.ts`'s dispatch half) — all five tools now have an
+ * inputSchema row below.
  */
 
 const DISPUTE_UUID = '11111111-1111-1111-1111-111111111111';
@@ -138,7 +137,7 @@ function jsonAfterHeadline(text: string): unknown {
 // ---------------------------------------------------------------------------
 
 test('no dispute inputSchema has a top-level oneOf/anyOf/allOf', () => {
-  for (const name of ['tribeunal_open_dispute', 'tribeunal_submit_evidence', 'tribeunal_appeal_ruling']) {
+  for (const name of ['tribeunal_open_dispute', 'tribeunal_submit_evidence', 'tribeunal_await_ruling', 'tribeunal_verify_ruling', 'tribeunal_appeal_ruling']) {
     const schema = findTool(name)!.inputSchema as Record<string, unknown>;
     assert.ok(!('oneOf' in schema), `${name} must not use a top-level oneOf`);
     assert.ok(!('anyOf' in schema), `${name} must not use a top-level anyOf`);
@@ -198,9 +197,15 @@ test('AwaitRulingSchema requires only disputeUuid, defaulting until/timeoutSecon
   assert.equal(parsed.timeoutSeconds, 150);
 });
 
-// Task 5 adds the tribeunal_verify_ruling TOOL_DEFINITIONS entry; its zod
-// schema already exists and is checked against the required list directly
-// here.
+test('tribeunal_verify_ruling inputSchema keys and required match the zod shape', () => {
+  const def = findTool('tribeunal_verify_ruling')!;
+  const props = def.inputSchema.properties as Record<string, { description?: string }>;
+  assert.deepEqual(Object.keys(props).sort(), ['decisionUuid', 'bundleUrl', 'rpcUrl'].sort());
+  assert.deepEqual(def.inputSchema.required, []);
+  assert.equal(props.decisionUuid.description, DESC.decisionUuid);
+  assert.equal(props.bundleUrl.description, DESC.bundleUrl);
+  assert.equal(props.rpcUrl.description, DESC.rpcUrl);
+});
 
 test('VerifyRulingSchema requires nothing at the top level', () => {
   assert.doesNotThrow(() => VerifyRulingSchema.parse({ decisionUuid: DISPUTE_UUID }));
@@ -479,12 +484,18 @@ test('each wired tool description contains its Proves/Does NOT prove sentence', 
   const submit = findTool('tribeunal_submit_evidence')!.description;
   assert.ok(submit.includes(`Proves: ${HONESTY.submitEvidence.proves}. Does NOT prove: ${HONESTY.submitEvidence.doesNotProve}`));
 
+  const awaitRulingDesc = findTool('tribeunal_await_ruling')!.description;
+  assert.ok(awaitRulingDesc.includes(`Proves: ${HONESTY.awaitRuling.proves}. Does NOT prove: ${HONESTY.awaitRuling.doesNotProve}`));
+
+  const verify = findTool('tribeunal_verify_ruling')!.description;
+  assert.ok(verify.includes(`Proves: ${HONESTY.verifyRuling.proves}. Does NOT prove: ${HONESTY.verifyRuling.doesNotProve}`));
+
   const appeal = findTool('tribeunal_appeal_ruling')!.description;
   assert.ok(appeal.includes(`Proves: ${HONESTY.appealRuling.proves}. Does NOT prove: ${HONESTY.appealRuling.doesNotProve}`));
 });
 
 test("each wired tool's description first sentence ends at \". \" plus a capital", () => {
-  for (const name of ['tribeunal_open_dispute', 'tribeunal_submit_evidence', 'tribeunal_appeal_ruling']) {
+  for (const name of ['tribeunal_open_dispute', 'tribeunal_submit_evidence', 'tribeunal_await_ruling', 'tribeunal_verify_ruling', 'tribeunal_appeal_ruling']) {
     const description = findTool(name)!.description;
     const match = description.match(/^[^.]*\. [A-Z]/);
     assert.ok(match, `${name}'s description must end its first sentence at ". " + a capital`);

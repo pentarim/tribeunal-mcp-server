@@ -8,6 +8,7 @@ import {
   OpenDisputeSchema,
   SubmitEvidenceSchema,
   AwaitRulingSchema,
+  VerifyRulingSchema,
   AppealRulingSchema,
   buildOpenBody,
   buildFilingBody,
@@ -17,6 +18,7 @@ import {
   awaitRuling,
   localContentHash,
   disputeApiError,
+  HONESTY as DISPUTE_HONESTY,
 } from '../tools/disputes.js';
 
 // Case schemas
@@ -839,6 +841,21 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'tribeunal_verify_ruling',
+    title: 'Verify ruling',
+    annotations: { title: 'Verify ruling', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    description: "Recompute a Tribeunal ruling's proofs instead of trusting the server's word. It fetches the public bundle and checks, with the labels of the app's tools/ruling-verify.mjs: digest, reopen, signature[i] (EIP-712 Verdict signature), attestation[i] (EAS off-chain), signer and attester (against /.well-known/tribeunal-verdict-signer), inclusion and checkpoint (transparency log), anchor (on-chain root; only with rpcUrl) and dispute (the dispute block agrees with itself and the signed verdict). Each is ok, FAIL or n/a; ok is false when any check FAILs; a missing well-known, an unlogged ruling or an unreachable RPC is n/a, never FAIL. Pass exactly one of decisionUuid or bundleUrl (on this server's host). independent is always false: bundle, signer and log key all come from the server being checked, and witness cosignatures are counted, not verified; run the returned command on a machine you control for an independent check. Returns {ok, checks: [{name, result, detail}], independent, trustedSigner: {address, source, url}, witnesses, decisionUuid, caseUuid, command, honesty}. Refused: 404 ruling_not_found (unknown, or private and not yours to view). Proves: Cryptographic consistency against the published signer, the log and optionally the chain. Does NOT prove: Independence (`independent:false`); no witness cosigns the log yet. The dispute block proves: Round structure, each round's case and verdict, the standing ruling and its basis, deadlines as configured, the final flag. Does NOT prove: `finalAt`/`confirmedAt` are app-observed; `basis:'app-window'` finality is Tribeunal's promise, not economics; `consent:'claimant_only'` means the respondent never agreed to arbitrate; `execution:null` means nothing moved",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        decisionUuid: { type: 'string', pattern: UUID_PATTERN, description: DISPUTE_DESC.decisionUuid },
+        bundleUrl: { type: 'string', format: 'uri', description: DISPUTE_DESC.bundleUrl },
+        rpcUrl: { type: 'string', format: 'uri', description: DISPUTE_DESC.rpcUrl },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'tribeunal_appeal_ruling',
     title: 'Appeal ruling',
     annotations: { title: 'Appeal ruling', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -1463,6 +1480,91 @@ export async function dispatchToolCall(
       case 'tribeunal_await_ruling': {
         const p = AwaitRulingSchema.parse(params);
         const { result, headline } = await awaitRuling(apiClient, p, ctx);
+        return { content: [{ type: 'text', text: `${headline}\n\n${JSON.stringify(result, null, 2)}` }] };
+      }
+
+      case 'tribeunal_verify_ruling': {
+        const p = VerifyRulingSchema.parse(params);
+
+        // Resolve the decision uuid (and optional share token) from bundleUrl,
+        // which must be on this client's own host — the Bearer never leaves
+        // the configured host, and this check runs before any client call.
+        let decisionUuid: string;
+        let share: string | undefined;
+        if (p.bundleUrl !== undefined) {
+          const url = new URL(p.bundleUrl);
+          if (url.origin !== apiClient.origin) {
+            throw new Error(`Invalid parameters: bundleUrl must be on ${apiClient.origin}`);
+          }
+          const match = url.pathname.match(/\/(?:api\/)?rulings\/([^/]+)\/?$/);
+          if (!match) {
+            throw new Error('Invalid parameters: bundleUrl must point at a ruling');
+          }
+          decisionUuid = match[1];
+          share = url.searchParams.get('share') ?? undefined;
+        } else {
+          decisionUuid = p.decisionUuid as string;
+        }
+
+        const bundle = (await apiClient.getRulingBundle(decisionUuid, share).catch(disputeApiError)) as any;
+
+        // Tolerant well-known fetches: any failure already comes back as null
+        // from getWellKnown — a missing well-known is n/a in verifyBundle(),
+        // never a FAIL.
+        const [signerDoc, logKeyText, anchorDoc] = await Promise.all([
+          apiClient.getWellKnown('/.well-known/tribeunal-verdict-signer', 'json'),
+          apiClient.getWellKnown('/.well-known/tribeunal-log-key', 'text'),
+          apiClient.getWellKnown('/.well-known/tribeunal-log-anchor', 'json'),
+        ]);
+
+        // Lazy, Worker-safe: this is the only path that ever evaluates the
+        // viem-backed verifier module (spec §4.4, §2.3).
+        const { verifyBundle } = await import('../verify/ruling-verifier.js');
+        const verified = await verifyBundle({
+          bundle,
+          signerDoc: (signerDoc ?? null) as any,
+          logKeyText: (logKeyText ?? null) as any,
+          anchorDoc: (anchorDoc ?? null) as any,
+          rpcUrl: p.rpcUrl,
+        });
+
+        const okCount = verified.checks.filter((c) => c.result === 'ok').length;
+        const naCount = verified.checks.filter((c) => c.result === 'n/a').length;
+        const failCount = verified.checks.filter((c) => c.result === 'FAIL').length;
+
+        // command (spec §4.4): the online form only when the served
+        // canonicalJson names a public case; every dispute round is private,
+        // so the offline recipe is the common case.
+        let isPublicRuling = false;
+        if (bundle?.ruling?.canonicalJsonStatus === 'served') {
+          try {
+            const parsed = JSON.parse(bundle.ruling.canonicalJson) as { case?: { visibility?: string } };
+            isPublicRuling = parsed.case?.visibility === 'public';
+          } catch {
+            isPublicRuling = false;
+          }
+        }
+        const rpcSuffix = p.rpcUrl ? ` --rpc ${p.rpcUrl}` : '';
+        const command = isPublicRuling
+          ? `node tools/ruling-verify.mjs ${apiClient.rulingBundleUrl(decisionUuid)}${rpcSuffix}`
+          : `node tools/ruling-verify.mjs --bundle <this bundle, saved as a party> --signer ${apiClient.origin}/.well-known/tribeunal-verdict-signer --log-key ${apiClient.origin}/.well-known/tribeunal-log-key${rpcSuffix}`;
+
+        const result = {
+          ok: verified.ok,
+          checks: verified.checks,
+          independent: verified.independent,
+          trustedSigner: {
+            address: (signerDoc as { address?: string } | null)?.address ?? null,
+            source: 'well-known' as const,
+            url: `${apiClient.origin}/.well-known/tribeunal-verdict-signer`,
+          },
+          witnesses: verified.witnesses,
+          decisionUuid: bundle?.ruling?.decisionUuid ?? decisionUuid,
+          caseUuid: bundle?.ruling?.caseUuid ?? null,
+          command,
+          honesty: DISPUTE_HONESTY.verifyRuling,
+        };
+        const headline = `Verified: ${okCount} ok, ${naCount} n/a, ${failCount} FAIL — independent: false`;
         return { content: [{ type: 'text', text: `${headline}\n\n${JSON.stringify(result, null, 2)}` }] };
       }
 

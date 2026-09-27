@@ -14,7 +14,7 @@ import { TOOL_DEFINITIONS } from '../src/core/tools.js';
 const VERBS = [
   'create', 'get', 'search', 'update', 'delete', 'close', 'await', 'cast',
   'revoke', 'post', 'list', 'mark', 'unmark', 'rate', 'invite', 'join',
-  'leave', 'start', 'cancel', 'remove', 'open', 'submit', 'appeal',
+  'leave', 'start', 'cancel', 'remove', 'open', 'submit', 'appeal', 'verify',
 ];
 const NAME_RE = new RegExp(`^tribeunal_(${VERBS.join('|')})_[a-z_]+$`);
 
