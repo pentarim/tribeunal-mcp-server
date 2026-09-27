@@ -7,12 +7,14 @@ import {
   DESC as DISPUTE_DESC,
   OpenDisputeSchema,
   SubmitEvidenceSchema,
+  AwaitRulingSchema,
   AppealRulingSchema,
   buildOpenBody,
   buildFilingBody,
   openResult,
   filingResult,
   appealResult,
+  awaitRuling,
   localContentHash,
   disputeApiError,
 } from '../tools/disputes.js';
@@ -775,8 +777,8 @@ export const TOOL_DEFINITIONS = [
       required: ['webhookId'],
     },
   },
-  // Dispute tools (5) — tribeunal_await_ruling and tribeunal_verify_ruling
-  // are added by the tasks that build them on top of ../tools/disputes.ts.
+  // Dispute tools (5) — tribeunal_verify_ruling is added by the task that
+  // builds it on top of ../tools/disputes.ts.
   {
     name: 'tribeunal_open_dispute',
     title: 'Open dispute',
@@ -817,6 +819,21 @@ export const TOOL_DEFINITIONS = [
         disputeUuid: { type: 'string', pattern: UUID_PATTERN, description: DISPUTE_DESC.disputeUuid },
         text: { type: 'string', minLength: 1, maxLength: 5000, description: DISPUTE_DESC.text },
         x402Receipt: X402_RECEIPT_JSON_SCHEMA,
+      },
+      required: ['disputeUuid'],
+    },
+  },
+  {
+    name: 'tribeunal_await_ruling',
+    title: 'Await dispute ruling',
+    annotations: { title: 'Await dispute ruling', readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: "Block until a dispute you are a party to reaches a ruling, up to timeoutSeconds; returns at once when it already has one. Unlike tribeunal_await_verdict (one case), this follows the dispute across appeal rounds. until \"provisional\" (default) wakes on the latest round's verdict; until \"final\" wakes only once the dispute is recorded as having no further appeal, which a once-a-minute job does after the last appeal window lapses. standingRuling is 0 (void), 1 (claimant) or 2 (respondent); a Void appeal round never moves it. Returns {status: `pending`|`provisional`|`final`, timedOut, waitedS, round, roundState, panelMode, decisionUuid, ruling, standingRuling, basisDecisionUuid, bundleUrl, signed, appealDeadline, mayAppeal, youMayAppeal, nextCheckAfter, final, finalAt, finalRuling, finalDecisionUuid, execution, honesty}. PROTOCOL: on timedOut re-arm, but not before nextCheckAfter; appeal windows last hours or days and every poll spends the 100 requests/hour budget. Next: tribeunal_verify_ruling; if youMayAppeal, tribeunal_appeal_ruling before appealDeadline. Refused: 404 dispute_not_found. Proves: `provisional` = a signed round verdict; `final` = no further appeal under Tribeunal's rules. Does NOT prove: That money moved (see `execution`)",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        disputeUuid: { type: 'string', pattern: UUID_PATTERN, description: DISPUTE_DESC.disputeUuid },
+        until: { type: 'string', enum: ['provisional', 'final'], default: 'provisional', description: DISPUTE_DESC.until },
+        timeoutSeconds: { type: 'integer', minimum: 5, maximum: 170, default: 150, description: DISPUTE_DESC.timeoutSeconds },
       },
       required: ['disputeUuid'],
     },
@@ -1441,6 +1458,12 @@ export async function dispatchToolCall(
           lines.push('Notice: the server-recorded contentHash does not match the locally computed hash of what was sent.');
         }
         return { content: [{ type: 'text', text: `${lines.join('\n')}\n\n${JSON.stringify(result, null, 2)}` }] };
+      }
+
+      case 'tribeunal_await_ruling': {
+        const p = AwaitRulingSchema.parse(params);
+        const { result, headline } = await awaitRuling(apiClient, p, ctx);
+        return { content: [{ type: 'text', text: `${headline}\n\n${JSON.stringify(result, null, 2)}` }] };
       }
 
       case 'tribeunal_appeal_ruling': {

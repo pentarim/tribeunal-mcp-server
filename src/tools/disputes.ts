@@ -1,16 +1,24 @@
 import { z } from 'zod';
 
 import { TribeunalAPIError } from '../client/api-client.js';
-import type { DisputeAppealResult, DisputeDocument, DisputeFilingResult } from '../client/api-client.js';
+import type {
+  DisputeAppealResult,
+  DisputeDocument,
+  DisputeFilingResult,
+  DisputeRound,
+  DisputeStanding,
+  RulingBundle,
+  TribeunalAPIClient,
+} from '../client/api-client.js';
+import { pollUntil, type AwaitContext } from './activity.js';
 import { subtle } from '../verify/webcrypto.js';
 import { disputeUuid, UUID_RE } from './uuid.js';
 
-// Agent dispute tools — schemas, honesty rows, error wrapping, result shaping
-// and the local content-hash check shared by tribeunal_open_dispute,
-// tribeunal_submit_evidence, tribeunal_await_ruling, tribeunal_verify_ruling
-// and tribeunal_appeal_ruling (design spec 2026-09-26-agent-dispute-tools,
-// §3/§4). `awaitRuling()`/`rulingHeadline()` live here too but are added by
-// the task that builds tribeunal_await_ruling on top of this file.
+// Agent dispute tools — schemas, honesty rows, error wrapping, result shaping,
+// the cross-round ruling poll and the local content-hash check shared by
+// tribeunal_open_dispute, tribeunal_submit_evidence, tribeunal_await_ruling,
+// tribeunal_verify_ruling and tribeunal_appeal_ruling (design spec
+// 2026-09-26-agent-dispute-tools, §3/§4).
 
 /** The app's hard value cap, mirrored client-side so an over-cap open never reaches the network (I6). */
 export const DISPUTE_VALUE_CAP_MINOR = '2000000000';
@@ -295,6 +303,196 @@ export function appealResult(api: DisputeAppealResult) {
     appealDeadline: null,
     honesty: HONESTY.appealRuling,
   };
+}
+
+// awaitRuling() + rulingHeadline() (spec §4.1) — the cross-round ruling poll
+// backing tribeunal_await_ruling. Source: the dispute document, not the
+// activity feed. A dispute spans one child case per round, so a case-scoped
+// cursor watches the wrong object after an appeal, and `final` lives only on
+// the document; each tick is one GET /api/disputes/{uuid} through the same
+// `pollUntil` cadence/progress/abort/timedOut rules await_verdict uses.
+
+type RulingStatus = 'pending' | 'provisional' | 'final';
+type MayAppeal = 'claimant' | 'respondent' | 'either' | null;
+
+/** Result of tribeunal_await_ruling — key set fixed by spec §4.1/§3.5. */
+export interface AwaitRulingResult {
+  status: RulingStatus;
+  timedOut: boolean;
+  waitedS: number;
+  disputeUuid: string;
+  viewerRole: string;
+  round: number;
+  roundState: string;
+  caseUuid: string;
+  panelMode: 'ai' | 'human';
+  endsAt: string;
+  decisionUuid: string | null;
+  ruling: 0 | 1 | 2 | null;
+  standingRuling: 0 | 1 | 2 | null;
+  basisDecisionUuid: string | null;
+  bundleUrl: string | null;
+  signed: boolean | null;
+  appealDeadline: string | null;
+  mayAppeal: MayAppeal;
+  youMayAppeal: boolean;
+  nextCheckAfter: string | null;
+  final: boolean;
+  finalAt: string | null;
+  finalRuling: 0 | 1 | 2 | null;
+  finalDecisionUuid: string | null;
+  execution: null;
+  panelHonesty: typeof HONESTY.aiPanel | null;
+  honesty: typeof HONESTY.awaitRuling;
+}
+
+/** `doc.rounds`' highest `round` — the dispute's current round. */
+function highestRound(doc: DisputeDocument): DisputeRound {
+  return doc.rounds.reduce((a, b) => (b.round > a.round ? b : a));
+}
+
+/** `final` comes only from `final.at`: a closed round with a lapsed appeal window stays `provisional` until `trb:dispute:finalize` writes it. */
+function rulingStatus(doc: DisputeDocument, latest: DisputeRound): RulingStatus {
+  if (doc.final.at !== null) return 'final';
+  if (latest.state === 'closed' && latest.decisionUuid !== null) return 'provisional';
+  return 'pending';
+}
+
+function isRulingDone(doc: DisputeDocument, until: 'provisional' | 'final'): boolean {
+  const status = rulingStatus(doc, highestRound(doc));
+  return until === 'final' ? status === 'final' : status !== 'pending';
+}
+
+/**
+ * `signed` is tri-state: `true`/`false` from a fetched bundle's
+ * `signatures.length`, `null` when it was not checked (no `decisionUuid`, or
+ * the fetch 404s / throws — never surfaced as a failure of the await call
+ * itself). A failed fetch never reads as unsigned.
+ */
+async function fetchSigned(client: TribeunalAPIClient, decisionUuid: string | null): Promise<boolean | null> {
+  if (!decisionUuid) return null;
+  try {
+    const bundle: RulingBundle = await client.getRulingBundle(decisionUuid);
+    return bundle.signatures.length > 0;
+  } catch {
+    return null;
+  }
+}
+
+/** standing 1 -> respondent (claimant won, respondent may appeal), 2 -> claimant, 0 (void) -> either; only while provisional, the window is open (`appealWindowSeconds > 0`, 0 = last round) and the deadline has not lapsed. */
+function mayAppealFor(status: RulingStatus, latest: DisputeRound, standing: DisputeStanding | null, now: number): MayAppeal {
+  if (status !== 'provisional') return null;
+  if (latest.appealWindowSeconds <= 0) return null;
+  if (!latest.appealDeadline || new Date(latest.appealDeadline).getTime() <= now) return null;
+  if (!standing) return null;
+  if (standing.ruling === 1) return 'respondent';
+  if (standing.ruling === 2) return 'claimant';
+  return 'either';
+}
+
+function youMayAppealFor(mayAppeal: MayAppeal, viewerRole: string): boolean {
+  if (mayAppeal === null) return false;
+  if (mayAppeal === 'either') return viewerRole === 'claimant' || viewerRole === 'respondent';
+  return mayAppeal === viewerRole;
+}
+
+/** A future `endsAt` while pending; a future `appealDeadline` while provisional under `until:'final'`; else null (a close or finalize job is due). */
+function nextCheckAfterFor(status: RulingStatus, until: 'provisional' | 'final', latest: DisputeRound, now: number): string | null {
+  if (status === 'pending') {
+    return new Date(latest.endsAt).getTime() > now ? latest.endsAt : null;
+  }
+  if (status === 'provisional' && until === 'final') {
+    return latest.appealDeadline && new Date(latest.appealDeadline).getTime() > now ? latest.appealDeadline : null;
+  }
+  return null;
+}
+
+/**
+ * Block until a dispute you are a party to reaches a ruling (spec §4.1),
+ * across appeal rounds. `until:'provisional'` (default) wakes on the latest
+ * round's verdict; `until:'final'` wakes only once the dispute is recorded as
+ * having no further appeal.
+ */
+export async function awaitRuling(
+  client: TribeunalAPIClient,
+  args: { disputeUuid: string; until: 'provisional' | 'final'; timeoutSeconds: number },
+  ctx: AwaitContext = {},
+): Promise<{ result: AwaitRulingResult; headline: string }> {
+  const polled = await pollUntil<DisputeDocument>(
+    () => client.getDispute(args.disputeUuid).catch(disputeApiError),
+    (doc) => isRulingDone(doc, args.until),
+    args.timeoutSeconds,
+    ctx,
+    'await_ruling',
+  );
+
+  const latest = highestRound(polled);
+  const status = rulingStatus(polled, latest);
+  const now = Date.now();
+  const decisionUuid = latest.decisionUuid;
+  const signed = await fetchSigned(client, decisionUuid);
+  const mayAppeal = mayAppealFor(status, latest, polled.standing, now);
+  // Not part of the result's frozen key set — only needed to word the `final` headline.
+  const basisRound = polled.standing?.basisRound ?? latest.round;
+
+  const result: AwaitRulingResult = {
+    status,
+    timedOut: polled.timedOut,
+    waitedS: polled.waitedS,
+    disputeUuid: polled.disputeUuid,
+    viewerRole: polled.viewerRole,
+    round: latest.round,
+    roundState: latest.state,
+    caseUuid: latest.caseUuid,
+    panelMode: latest.panelMode,
+    endsAt: latest.endsAt,
+    decisionUuid,
+    ruling: latest.ruling,
+    standingRuling: polled.standing ? polled.standing.ruling : null,
+    basisDecisionUuid: polled.standing ? polled.standing.basisDecisionUuid : null,
+    bundleUrl: decisionUuid ? client.rulingBundleUrl(decisionUuid) : null,
+    signed,
+    appealDeadline: latest.appealDeadline,
+    mayAppeal,
+    youMayAppeal: youMayAppealFor(mayAppeal, polled.viewerRole),
+    nextCheckAfter: nextCheckAfterFor(status, args.until, latest, now),
+    final: status === 'final',
+    finalAt: polled.final.at,
+    finalRuling: polled.final.ruling,
+    finalDecisionUuid: polled.final.decisionUuid,
+    execution: null,
+    panelHonesty: latest.panelMode === 'ai' ? HONESTY.aiPanel : null,
+    honesty: HONESTY.awaitRuling,
+  };
+
+  return { result, headline: rulingHeadline(result, basisRound) };
+}
+
+/**
+ * One of the four spec §4.1 headlines for an await-ruling result. `basisRound`
+ * is `DisputeStanding.basisRound` — the standing ruling's basis round, not
+ * part of the JSON result — needed only to word the `final` headline. Never
+ * prints `null`/`undefined`.
+ */
+export function rulingHeadline(result: AwaitRulingResult, basisRound: number | null): string {
+  const label = (r: 0 | 1 | 2 | null): 'void' | 'claimant' | 'respondent' => (r === 2 ? 'respondent' : r === 1 ? 'claimant' : 'void');
+
+  if (result.status === 'pending') {
+    return `Pending: round ${result.round} (${result.panelMode}) is open until ${result.endsAt}.`;
+  }
+
+  const sig = result.signed === true ? 'signed' : result.signed === false ? 'unsigned' : 'signature not checked';
+
+  if (result.status === 'provisional') {
+    const word = label(result.ruling);
+    if (result.mayAppeal) {
+      return `Provisional ruling, round ${result.round}: ${word} (${sig}). Appealable by ${result.mayAppeal} until ${result.appealDeadline}.`;
+    }
+    return `Provisional ruling, round ${result.round}: ${word} (${sig}). No appeal is open now; await until "final".`;
+  }
+
+  const word = label(result.finalRuling);
+  return `Final under Tribeunal's rules: ${word} (basis round ${basisRound ?? result.round}).`;
 }
 
 // Local content hash (spec §4.2) — recomputed client-side so

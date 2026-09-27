@@ -201,6 +201,16 @@ export interface DisputeFilingResult {
   inRecord: true;
 }
 
+/**
+ * GET /api/rulings/{uuid} — the public ruling bundle (see the app's
+ * `tools/ruling-verify.mjs`). `tribeunal_await_ruling` reads only
+ * `signatures` (to derive its tri-state `signed`); `tribeunal_verify_ruling`
+ * (Task 5) reads the rest of the bundle to recompute the script's checks.
+ */
+export interface RulingBundle {
+  signatures: unknown[];
+}
+
 /** POST /api/disputes/{uuid}/appeals 201 body. */
 export interface DisputeAppealResult {
   disputeUuid: string;
@@ -225,10 +235,12 @@ export class TribeunalAPIClient {
   private client: AxiosInstance;
   private bearerToken: string | undefined;
   private baseOrigin: string;
+  private baseURL: string;
 
   constructor(config: TribeunalAPIClientConfig) {
     const { baseURL, bearerToken, httpsAgent } = config;
     this.baseOrigin = new URL(baseURL).origin;
+    this.baseURL = baseURL.replace(/\/+$/, '');
     this.bearerToken = bearerToken;
 
     const axiosConfig: Parameters<typeof axios.create>[0] = {
@@ -667,6 +679,19 @@ export class TribeunalAPIClient {
   async appealDispute(uuid: string, reason: string): Promise<DisputeAppealResult> {
     const response = await this.client.post(`/disputes/${uuid}/appeals`, { reason });
     return response.data as DisputeAppealResult;
+  }
+
+  /** GET /api/rulings/{uuid} — the public ruling bundle; `share` appends `?share=` for a private ruling's share token. */
+  async getRulingBundle(uuid: string, share?: string): Promise<RulingBundle> {
+    const params: Record<string, string> = {};
+    if (share) params.share = share;
+    const response = await this.client.get(`/rulings/${uuid}`, { params });
+    return response.data as RulingBundle;
+  }
+
+  /** Absolute bundle URL for a decisionUuid, from this client's own baseURL (e.g. https://tribeunal.test/api/rulings/{uuid}). */
+  rulingBundleUrl(uuid: string): string {
+    return `${this.baseURL}/rulings/${uuid}`;
   }
 }
 

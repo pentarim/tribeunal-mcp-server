@@ -18,12 +18,12 @@ import { TribeunalAPIError, type TribeunalAPIClient } from '../src/client/api-cl
 
 /**
  * design spec 2026-09-26-agent-dispute-tools §8.1 `tests/disputes.test.ts`.
- * This task (plan Task 2) wires only the three write tools — open, submit,
- * appeal — so the dispatch-level assertions below cover those three; the
- * await/verify ROWS are asserted against their zod schemas directly (their
- * TOOL_DEFINITIONS entries land in Tasks 3 and 5, at which point the schema
- * they already satisfy here is the same one the new dispatch case parses
- * with).
+ * Plan Task 2 wired the three write tools (open, submit, appeal); Task 3
+ * (`tests/await-ruling.test.ts`) wires tribeunal_await_ruling and adds its
+ * inputSchema row below. Only tribeunal_verify_ruling's row is still checked
+ * against its zod schema directly (its TOOL_DEFINITIONS entry lands in
+ * Task 5, at which point the schema it already satisfies here is the same
+ * one the new dispatch case parses with).
  */
 
 const DISPUTE_UUID = '11111111-1111-1111-1111-111111111111';
@@ -180,16 +180,27 @@ test('tribeunal_appeal_ruling inputSchema keys and required match the zod shape'
   assert.equal(props.reason.description, DESC.reason);
 });
 
-// Tasks 3 and 5 add the tribeunal_await_ruling / tribeunal_verify_ruling
-// TOOL_DEFINITIONS entries; their zod schemas already exist and are checked
-// against the required lists directly here.
-test('AwaitRulingSchema requires only disputeUuid', () => {
+test('tribeunal_await_ruling inputSchema keys and required match the zod shape', () => {
+  const def = findTool('tribeunal_await_ruling')!;
+  const props = def.inputSchema.properties as Record<string, { description?: string }>;
+  assert.deepEqual(Object.keys(props).sort(), ['disputeUuid', 'until', 'timeoutSeconds'].sort());
+  assert.deepEqual(def.inputSchema.required, ['disputeUuid']);
+  assert.equal(props.disputeUuid.description, DESC.disputeUuid);
+  assert.equal(props.until.description, DESC.until);
+  assert.equal(props.timeoutSeconds.description, DESC.timeoutSeconds);
+});
+
+test('AwaitRulingSchema requires only disputeUuid, defaulting until/timeoutSeconds', () => {
   assert.throws(() => AwaitRulingSchema.parse({}));
   const parsed = AwaitRulingSchema.parse({ disputeUuid: DISPUTE_UUID });
   assert.equal(parsed.disputeUuid, DISPUTE_UUID);
   assert.equal(parsed.until, 'provisional');
   assert.equal(parsed.timeoutSeconds, 150);
 });
+
+// Task 5 adds the tribeunal_verify_ruling TOOL_DEFINITIONS entry; its zod
+// schema already exists and is checked against the required list directly
+// here.
 
 test('VerifyRulingSchema requires nothing at the top level', () => {
   assert.doesNotThrow(() => VerifyRulingSchema.parse({ decisionUuid: DISPUTE_UUID }));
