@@ -138,6 +138,9 @@ export const HONESTY = {
 // <hint>` — code first, as skills/using-tribeunal/references/errors.md
 // teaches — rather than a bare message.
 function hintFor(code: string, details: { limit?: number }): string {
+  if (code === 'invalid_json') {
+    return 'a tool bug; report it';
+  }
   if (code.startsWith('invalid_') || code === 'asset_unsupported') {
     return 'fix that argument; an unchanged retry cannot work';
   }

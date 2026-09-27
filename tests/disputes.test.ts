@@ -222,7 +222,7 @@ test('valueMinor one over the cap is refused with zero client calls', async () =
     () => dispatchToolCall(client, 'tribeunal_open_dispute', { ...OPEN_BASE, valueMinor: '2000000001' }),
     (err: Error) => {
       assert.match(err.message, /^Invalid parameters/);
-      assert.match(err.message, /valueMinor exceeds the 2000 USDC cap \(2000000000 minor units\)/);
+      assert.ok(err.message.includes('valueMinor exceeds the 2000 USDC cap (2000000000 minor units)'));
       return true;
     },
   );
@@ -231,7 +231,13 @@ test('valueMinor one over the cap is refused with zero client calls', async () =
 
 test('valueMinor over the cap with leading zeros is still refused with zero client calls', async () => {
   const { calls, client } = fakeClient();
-  await assert.rejects(() => dispatchToolCall(client, 'tribeunal_open_dispute', { ...OPEN_BASE, valueMinor: '02000000001' }));
+  await assert.rejects(
+    () => dispatchToolCall(client, 'tribeunal_open_dispute', { ...OPEN_BASE, valueMinor: '02000000001' }),
+    (err: Error) => {
+      assert.ok(err.message.includes('valueMinor exceeds the 2000 USDC cap (2000000000 minor units)'));
+      return true;
+    },
+  );
   assert.equal(calls.openDispute.length, 0);
 });
 
@@ -448,15 +454,14 @@ test('HONESTY rows are byte-equal to the master-plan text', () => {
 
 test('each wired tool description contains its Proves/Does NOT prove sentence', () => {
   const open = findTool('tribeunal_open_dispute')!.description;
-  assert.match(open, /Proves: The case exists, is private, and the value is ≤ cap\. Does NOT prove: Respondent consent/);
-  assert.match(open, /AI fast-track panel proves: 3 AI personas voted, with provenance and model alias\./);
-  assert.match(open, /\*\*Every AI ruling is appealable to humans\*\*/);
+  assert.ok(open.includes(`Proves: ${HONESTY.openDispute.proves}. Does NOT prove: ${HONESTY.openDispute.doesNotProve}`));
+  assert.ok(open.includes(`AI fast-track panel proves: ${HONESTY.aiPanel.proves}. Does NOT prove: ${HONESTY.aiPanel.doesNotProve}`));
 
   const submit = findTool('tribeunal_submit_evidence')!.description;
-  assert.match(submit, /Proves: The filing is hashed into the record the panel sees and the verdict commits to\. Does NOT prove: That the content is true/);
+  assert.ok(submit.includes(`Proves: ${HONESTY.submitEvidence.proves}. Does NOT prove: ${HONESTY.submitEvidence.doesNotProve}`));
 
   const appeal = findTool('tribeunal_appeal_ruling')!.description;
-  assert.match(appeal, /Proves: A fresh, larger, human-only round opened\. Does NOT prove: That humans will show up/);
+  assert.ok(appeal.includes(`Proves: ${HONESTY.appealRuling.proves}. Does NOT prove: ${HONESTY.appealRuling.doesNotProve}`));
 });
 
 test("each wired tool's description first sentence ends at \". \" plus a capital", () => {
@@ -479,11 +484,26 @@ test('every §3.5 code is wrapped as "API Error: <code> (<status>): <message> �
   const cases: Array<[string, number, string]> = [
     ['respondent_is_system', 422, "name the counterparty's own, active account (account-less respondents are unsupported)"],
     ['invalid_title', 422, 'fix that argument; an unchanged retry cannot work'],
+    ['invalid_claim', 422, 'fix that argument; an unchanged retry cannot work'],
+    ['invalid_x402_receipt', 422, 'fix that argument; an unchanged retry cannot work'],
     ['asset_unsupported', 422, 'fix that argument; an unchanged retry cannot work'],
+    ['invalid_json', 400, 'a tool bug; report it'],
     ['dispute_value_over_cap', 422, 'lower valueMinor'],
+    ['dispute_value_exceeds_receipt', 422, 'lower valueMinor'],
+    ['respondent_unknown', 422, "name the counterparty's own, active account (account-less respondents are unsupported)"],
+    ['respondent_is_self', 422, "name the counterparty's own, active account (account-less respondents are unsupported)"],
+    ['dispute_not_found', 404, 'unknown, or you are not a party; identical by design'],
     ['not_a_party', 403, 'an admin who is not a party cannot file or appeal'],
     ['dispute_filings_closed', 409, 'never, for this round or dispute'],
+    ['appeal_window_closed', 409, 'never, for this round or dispute'],
+    ['max_rounds', 409, 'never, for this round or dispute'],
+    ['dispute_final', 409, 'never, for this round or dispute'],
+    ['round_not_closed', 409, 'await the provisional ruling first'],
+    ['appeal_not_losing_party', 403, 'only the party the standing ruling goes against'],
+    ['origin_not_offchain', 409, 'a chain dispute is appealed on chain'],
     ['appeal_pool_unconfigured', 503, 'operator configuration; tell a human, do not loop'],
+    ['arbiter_unavailable', 503, 'operator configuration; tell a human, do not loop'],
+    ['ruling_not_found', 404, 'unknown decision, or a private ruling you cannot view'],
     ['insufficient_scope', 403, 're-consent with the named scope'],
   ];
   for (const [code, status, hint] of cases) {
@@ -525,6 +545,7 @@ test('a non-API error rethrows unchanged', () => {
 
 test('localContentHash matches the x402-receipt-vectors.json vector 0', async () => {
   const hash = await localContentHash({ x402Receipt: VALID_RECEIPT });
+  assert.equal(hash, 'd0811e060a18085e31340cd773756f14c4596a7352d4f543493497d84ec39be9');
   assert.equal(hash, VALID_RECEIPT_HASH);
 });
 
