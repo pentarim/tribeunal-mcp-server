@@ -1423,7 +1423,7 @@ export async function dispatchToolCall(
             {
               type: 'text',
               text:
-                `Dispute opened: round 0 (${result.panel}) — case ${result.caseUuid}, filings close at panelOpensAt ${result.panelOpensAt}.\n\n` +
+                `Dispute opened: round 0 (${result.panel}), case ${result.caseUuid}. File evidence before panelOpensAt ${result.panelOpensAt}, when the panel is seated.\n\n` +
                 JSON.stringify(result, null, 2),
             },
           ],

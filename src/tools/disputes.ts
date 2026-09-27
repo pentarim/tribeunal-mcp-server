@@ -137,7 +137,12 @@ export const HONESTY = {
 // `API Error: ${error.message}`) surfaces `<code> (<status>): <message> —
 // <hint>` — code first, as skills/using-tribeunal/references/errors.md
 // teaches — rather than a bare message.
-function hintFor(code: string, details: { limit?: number }): string {
+//
+// A code the §3.5 table does not list gets no invented hint, EXCEPT status
+// 429: the rate limiter's `Too Many Requests` code is not in the table, and
+// the most common such refusal, so it gets the one fact SERVER_INSTRUCTIONS
+// already states instead of silence.
+function hintFor(code: string, statusCode: number | undefined, details: { limit?: number }): string {
   if (code === 'invalid_json') {
     return 'a tool bug; report it';
   }
@@ -180,13 +185,18 @@ function hintFor(code: string, details: { limit?: number }): string {
   if (code === 'insufficient_scope') {
     return 're-consent with the named scope';
   }
-  return 'report this to Tribeunal support';
+  if (statusCode === 429) {
+    return 'the API allows 100 requests/hour; wait before retrying';
+  }
+  return '';
 }
 
 /**
  * Wraps every `TribeunalAPIError` a dispute route call throws, reading
  * `details.error` (the code) and `details.message`, into one whose `.message`
- * is `<code> (<status>): <message> — <hint>`. A non-`TribeunalAPIError`
+ * is `<code> (<status>): <message> — <hint>` (the ` — <hint>` segment, and
+ * the `: <message>` segment, each dropped when empty — never an invented
+ * hint for a code the §3.5 table does not list). A non-`TribeunalAPIError`
  * rethrows unchanged; a code-less 404 (a server that predates disputes)
  * becomes `404: this server has no dispute endpoints yet`.
  */
@@ -202,8 +212,10 @@ export function disputeApiError(e: unknown): never {
     }
     throw e;
   }
-  const hint = hintFor(code, details);
-  throw new TribeunalAPIError(`${code} (${e.statusCode}): ${details.message ?? ''} — ${hint}`, e.statusCode, e.details);
+  const hint = hintFor(code, e.statusCode, details);
+  const message = details.message ? `: ${details.message}` : '';
+  const suffix = hint ? ` — ${hint}` : '';
+  throw new TribeunalAPIError(`${code} (${e.statusCode})${message}${suffix}`, e.statusCode, e.details);
 }
 
 // Result shaping (spec §3.5). Each builds the tool's exact result-key set

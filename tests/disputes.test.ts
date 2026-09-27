@@ -403,6 +403,14 @@ test('open result key set is exact', async () => {
   assert.deepEqual(result.honesty, HONESTY.openDispute);
 });
 
+test('open headline never claims filings close at panelOpensAt', async () => {
+  const { client } = fakeClient();
+  const r = await dispatchToolCall(client, 'tribeunal_open_dispute', OPEN_BASE);
+  const headline = r.content[0].text as string;
+  assert.ok(!/filings close/.test(headline), `headline must not claim filings close: ${headline}`);
+  assert.match(headline, /File evidence before panelOpensAt/);
+});
+
 test('submit result key set is exact', async () => {
   const { client } = fakeClient();
   const r = await dispatchToolCall(client, 'tribeunal_submit_evidence', { disputeUuid: DISPUTE_UUID, text: 'hello' });
@@ -523,6 +531,28 @@ test('daily_limit_exceeded names the limit in its hint', async () => {
   await assert.rejects(
     () => dispatchToolCall(client, 'tribeunal_open_dispute', OPEN_BASE),
     /API Error: daily_limit_exceeded \(429\): m — 5 disputes per account per rolling 24 h/,
+  );
+});
+
+test('the API rate limiter\'s "Too Many Requests" body gets the 100/hour hint, not an invented one', async () => {
+  const { client } = throwingClient(
+    'openDispute',
+    new TribeunalAPIError('boom', 429, { error: 'Too Many Requests', message: 'API rate limit exceeded. Please try again later.' }),
+  );
+  await assert.rejects(
+    () => dispatchToolCall(client, 'tribeunal_open_dispute', OPEN_BASE),
+    /API Error: Too Many Requests \(429\): API rate limit exceeded\. Please try again later\. — the API allows 100 requests\/hour; wait before retrying/,
+  );
+});
+
+test('an unlisted code with no message and non-429 status gets no invented hint or empty segment', async () => {
+  const { client } = throwingClient('openDispute', new TribeunalAPIError('boom', 500, { error: 'some_unlisted_code' }));
+  await assert.rejects(
+    () => dispatchToolCall(client, 'tribeunal_open_dispute', OPEN_BASE),
+    (err: Error) => {
+      assert.equal(err.message, 'API Error: some_unlisted_code (500)');
+      return true;
+    },
   );
 });
 
