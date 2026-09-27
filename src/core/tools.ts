@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TribeunalAPIClient, TribeunalAPIError } from '../client/api-client.js';
-import { UUID_PATTERN, caseWithUuidOnly } from '../tools/uuid.js';
+import { UUID_PATTERN, UUID_RE, caseWithUuidOnly } from '../tools/uuid.js';
 
 // Dispute schemas, honesty rows and result/error shaping
 import {
@@ -779,8 +779,7 @@ export const TOOL_DEFINITIONS = [
       required: ['webhookId'],
     },
   },
-  // Dispute tools (5) — tribeunal_verify_ruling is added by the task that
-  // builds it on top of ../tools/disputes.ts.
+  // Dispute tools (5)
   {
     name: 'tribeunal_open_dispute',
     title: 'Open dispute',
@@ -1496,8 +1495,8 @@ export async function dispatchToolCall(
           if (url.origin !== apiClient.origin) {
             throw new Error(`Invalid parameters: bundleUrl must be on ${apiClient.origin}`);
           }
-          const match = url.pathname.match(/\/(?:api\/)?rulings\/([^/]+)\/?$/);
-          if (!match) {
+          const match = url.pathname.match(/^\/(?:api\/)?rulings\/([^/]+)\/?$/);
+          if (!match || !UUID_RE.test(match[1])) {
             throw new Error('Invalid parameters: bundleUrl must point at a ruling');
           }
           decisionUuid = match[1];

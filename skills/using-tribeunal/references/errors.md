@@ -69,7 +69,7 @@ The lifecycle tools (`update_case`, `delete_case`, `update_comment`, `delete_com
 | `invalid_json` (400) | Never — a tool bug, report it |
 | `dispute_value_over_cap`, `dispute_value_exceeds_receipt` (422) | Only after lowering `valueMinor` |
 | `respondent_unknown`, `respondent_is_self`, `respondent_is_system` (422) | Only with the counterparty's own, active account named — account-less respondents are unsupported |
-| `daily_limit_exceeded` (429) | Yes, after the rolling 24 h window that `limit` names |
+| `daily_limit_exceeded` (429) | Yes, once the rolling 24 h window frees a slot; `limit` is the number of disputes allowed per account in that window |
 | `dispute_not_found` (404) | Not without being a party — unknown and not-a-party answer identically by design |
 | `not_a_party` (403) | Never for this account — an admin who is not a party cannot file or appeal |
 | `invalid_filing` (422) | Only with the argument fixed |

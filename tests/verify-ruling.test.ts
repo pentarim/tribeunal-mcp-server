@@ -736,6 +736,31 @@ test('a bundleUrl on a foreign host is refused before any client call', async ()
   assert.equal(calls.getWellKnown.length, 0, 'no well-known fetch on a rejected foreign host');
 });
 
+test('a bundleUrl whose last path segment is not a UUID is refused before any client call', async () => {
+  const { calls, client } = fakeVerifyClient({ bundle: published() });
+  await assert.rejects(
+    () => dispatchToolCall(client, 'tribeunal_verify_ruling', { bundleUrl: 'https://tribeunal.test/whatever/rulings/not-a-uuid' }),
+    (err: Error) => {
+      assert.equal(err.message, 'Invalid parameters: bundleUrl must point at a ruling');
+      return true;
+    },
+  );
+  assert.equal(calls.getRulingBundle.length, 0, 'no bundle fetch on a rejected path');
+  assert.equal(calls.getWellKnown.length, 0, 'no well-known fetch on a rejected path');
+});
+
+test('a bundleUrl with a path-traversal segment is refused before any client call', async () => {
+  const { calls, client } = fakeVerifyClient({ bundle: published() });
+  await assert.rejects(
+    () => dispatchToolCall(client, 'tribeunal_verify_ruling', { bundleUrl: 'https://tribeunal.test/api/rulings/..%2F..%2Fusers%2Fme' }),
+    (err: Error) => {
+      assert.equal(err.message, 'Invalid parameters: bundleUrl must point at a ruling');
+      return true;
+    },
+  );
+  assert.equal(calls.getRulingBundle.length, 0, 'no bundle fetch on a rejected path');
+});
+
 test('rpcUrl must be https, or http on localhost/127.0.0.1', async () => {
   const { client } = fakeVerifyClient({ bundle: published(), anchor: null });
   await assert.rejects(
