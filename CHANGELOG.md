@@ -45,6 +45,15 @@ against an older one they answer 404.
   `serving-jury-duty` gains a gotcha row for the two new refusals; `references/errors.md` documents
   every dispute error code.
 
+### Security
+- **Remote server sign-in is hardened** (`mcp.tribeunal.com` only; the npm stdio server is not
+  affected). PKCE with S256 is now required at `/authorize`, and `plain` is no longer advertised. A
+  consent approval counts only from the browser that was shown the consent screen, and a sign-in
+  completes only in the browser that started it. The consent screen shows where access is sent and
+  says the client name is unverified. Approvals recorded before this change are void, so each
+  browser is asked once more. Live on the remote server since 2026-10-01, ahead of this release.
+  Thanks to the researcher who reported it privately.
+
 ## [2.1.0]
 
 No tool was added, removed or renamed: the 41-tool surface of 2.0.0 is unchanged.
