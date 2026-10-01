@@ -39,6 +39,8 @@ export default new OAuthProvider({
   tokenEndpoint: '/token',
   clientRegistrationEndpoint: '/register',
   scopesSupported: SCOPES_SUPPORTED,
+  // S256 only. `/authorize` additionally refuses a request with no challenge.
+  allowPlainPKCE: false,
   // Keep the upstream Auth0 tokens fresh and mirror their TTL onto MCP tokens.
   tokenExchangeCallback: makeTokenExchangeCallback(env as Env),
 });

@@ -7,19 +7,30 @@ import { Hono } from 'hono';
 import { PublicFiles } from './public-files';
 import type { Env, HonoEnv, UserProps } from './types';
 import {
+  approvedClientsCookie,
   buildAuth0AuthorizeUrl,
+  clearCookie,
   clientIdAlreadyApproved,
+  consentCookie,
   decodeJwtClaims,
   exchangeAuth0Code,
   generatePkcePair,
-  parseRedirectApproval,
+  loginCookie,
   randomToken,
+  readCookie,
   refreshAuth0Token,
   renderApprovalDialog,
+  sameToken,
+  setCookie,
 } from './oauth-utils';
 
 // How long a pending PKCE transaction is valid for (login round-trip), seconds.
 const PKCE_TX_TTL_SECONDS = 600;
+// How long a consent screen may sit open before it must be requested again, seconds.
+const CONSENT_TTL_SECONDS = 600;
+const INVALID_CONSENT = 'Invalid or expired authorization request. Please restart the connection from your MCP client.';
+// The shape of `randomToken()`; anything else never reaches a KV key.
+const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 
 /** KV record persisted between `/authorize` and `/callback` for one login. */
 interface PkceTransaction {
@@ -35,17 +46,41 @@ const app = new Hono<HonoEnv>();
  * Parses the incoming OAuth request, shows a one-time consent screen for new
  * MCP clients, then redirects the user to Auth0 Universal Login with the
  * audience + scopes from the contract and a PKCE S256 challenge.
+ *
+ * MCP clients register themselves and Auth0 skips its own consent for the one
+ * upstream application, so this screen is the only place a person agrees to a
+ * particular client. The request being approved is kept in KV under a random
+ * token; the form and a cookie carry the token, never the request.
  */
 app.get('/authorize', async (c) => {
-  const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+  let oauthReqInfo: AuthRequest;
+  try {
+    oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+  } catch (error) {
+    // The library throws on an unknown client or an unregistered redirect URI.
+    return c.text(`Invalid request: ${error instanceof Error ? error.message : 'bad authorization request'}`, 400);
+  }
   if (!oauthReqInfo.clientId) {
     return c.text('Invalid request: missing client_id', 400);
+  }
+  if (!oauthReqInfo.redirectUri) {
+    return c.text('Invalid request: missing redirect_uri', 400);
+  }
+  // OAuth 2.1 and the MCP authorization spec make PKCE mandatory. The library
+  // only checks a challenge when one was sent, so its absence is refused here.
+  if (!oauthReqInfo.codeChallenge || oauthReqInfo.codeChallengeMethod !== 'S256') {
+    return c.text('Invalid request: PKCE is required (code_challenge with code_challenge_method=S256)', 400);
   }
 
   // Skip the consent screen if this MCP client was already approved.
   if (await clientIdAlreadyApproved(c.req.raw, oauthReqInfo.clientId, c.env.COOKIE_ENCRYPTION_KEY)) {
-    return redirectToAuth0(c.req.raw, oauthReqInfo, c.env, {});
+    return redirectToAuth0(c.req.raw, oauthReqInfo, c.env, []);
   }
+
+  const consentToken = randomToken();
+  await c.env.OAUTH_KV.put(`consent:${consentToken}`, JSON.stringify(oauthReqInfo), {
+    expirationTtl: CONSENT_TTL_SECONDS,
+  });
 
   return renderApprovalDialog(c.req.raw, {
     client: await c.env.OAUTH_PROVIDER.lookupClient(oauthReqInfo.clientId),
@@ -53,21 +88,43 @@ app.get('/authorize', async (c) => {
       name: 'Tribeunal Remote MCP',
       description: 'Authorize this MCP client to act on your behalf on Tribeunal.',
     },
-    state: { oauthReqInfo },
+    redirectUri: oauthReqInfo.redirectUri,
+    consentToken,
+    ttlSeconds: CONSENT_TTL_SECONDS,
   });
 });
 
 /**
  * POST /authorize — the consent screen was approved.
  *
- * Records the client approval (signed cookie) and proceeds to Auth0.
+ * Counts only when the posted token matches the consent cookie, i.e. the post
+ * comes from the browser that was shown the screen. The request is then read
+ * from KV; nothing describing it is accepted from the form. Records the client
+ * approval (signed cookie) and proceeds to Auth0.
  */
 app.post('/authorize', async (c) => {
-  const { state, headers } = await parseRedirectApproval(c.req.raw, c.env.COOKIE_ENCRYPTION_KEY);
-  if (!state.oauthReqInfo) {
-    return c.text('Invalid request', 400);
+  // A body that is not a form answers the same 400 as a missing token.
+  const token = (await c.req.formData().catch(() => null))?.get('consent');
+  if (typeof token !== 'string' || !TOKEN_PATTERN.test(token)) {
+    return c.text(INVALID_CONSENT, 400);
   }
-  return redirectToAuth0(c.req.raw, state.oauthReqInfo, c.env, headers);
+  const cookieToken = readCookie(c.req.raw, consentCookie(token));
+  if (!cookieToken || !sameToken(token, cookieToken)) {
+    return c.text(INVALID_CONSENT, 400);
+  }
+
+  const consentKey = `consent:${token}`;
+  const stored = await c.env.OAUTH_KV.get(consentKey);
+  if (!stored) {
+    return c.text(INVALID_CONSENT, 400);
+  }
+  await c.env.OAUTH_KV.delete(consentKey);
+  const oauthReqInfo = JSON.parse(stored) as AuthRequest;
+
+  return redirectToAuth0(c.req.raw, oauthReqInfo, c.env, [
+    await approvedClientsCookie(c.req.raw, oauthReqInfo.clientId, c.env.COOKIE_ENCRYPTION_KEY),
+    clearCookie(c.req.raw, consentCookie(token)),
+  ]);
 });
 
 /**
@@ -87,6 +144,13 @@ app.get('/callback', async (c) => {
   }
   if (!code || !state) {
     return c.text('Invalid callback: missing code or state', 400);
+  }
+
+  // The login must finish in the browser that started it. Without this, a
+  // login URL prepared in one browser could be completed by someone else's.
+  const startedHere = TOKEN_PATTERN.test(state) ? readCookie(c.req.raw, loginCookie(state)) : null;
+  if (!startedHere || !sameToken(startedHere, state)) {
+    return c.text('This login was not started in this browser. Please restart the connection from your MCP client.', 400);
   }
 
   // Retrieve and consume the one-time PKCE transaction.
@@ -132,18 +196,22 @@ app.get('/callback', async (c) => {
     props,
   });
 
-  return Response.redirect(redirectTo);
+  return new Response(null, {
+    status: 302,
+    headers: { location: redirectTo, 'Set-Cookie': clearCookie(c.req.raw, loginCookie(state)) },
+  });
 });
 
 /**
  * Build the Auth0 authorize redirect, persisting the PKCE verifier + original
- * MCP auth request in KV keyed by the random `state` we send to Auth0.
+ * MCP auth request in KV keyed by the random `state` we send to Auth0. The
+ * same `state` is set as a cookie, which `/callback` requires back.
  */
 async function redirectToAuth0(
   request: Request,
   oauthReqInfo: AuthRequest,
   env: Env,
-  extraHeaders: Record<string, string>,
+  cookies: string[],
 ): Promise<Response> {
   const { codeVerifier, codeChallenge } = await generatePkcePair();
   const state = randomToken();
@@ -153,20 +221,22 @@ async function redirectToAuth0(
     expirationTtl: PKCE_TX_TTL_SECONDS,
   });
 
-  const location = buildAuth0AuthorizeUrl({
-    domain: env.AUTH0_DOMAIN,
-    clientId: env.AUTH0_CLIENT_ID,
-    redirectUri: new URL('/callback', request.url).href,
-    scope: env.AUTH0_SCOPE,
-    audience: env.AUTH0_AUDIENCE,
-    state,
-    codeChallenge,
+  const headers = new Headers({
+    location: buildAuth0AuthorizeUrl({
+      domain: env.AUTH0_DOMAIN,
+      clientId: env.AUTH0_CLIENT_ID,
+      redirectUri: new URL('/callback', request.url).href,
+      scope: env.AUTH0_SCOPE,
+      audience: env.AUTH0_AUDIENCE,
+      state,
+      codeChallenge,
+    }),
   });
+  for (const cookie of [...cookies, setCookie(request, loginCookie(state), state, PKCE_TX_TTL_SECONDS)]) {
+    headers.append('Set-Cookie', cookie);
+  }
 
-  return new Response(null, {
-    status: 302,
-    headers: { ...extraHeaders, location },
-  });
+  return new Response(null, { status: 302, headers });
 }
 
 /**
