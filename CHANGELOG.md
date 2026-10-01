@@ -52,7 +52,7 @@ against an older one they answer 404.
   completes only in the browser that started it. The consent screen shows where access is sent and
   says the client name is unverified. Approvals recorded before this change are void, so each
   browser is asked once more. Live on the remote server since 2026-10-01, ahead of this release.
-  Thanks to the researcher who reported it privately.
+  Thanks to [MD Rabbi Hossain](https://www.linkedin.com/in/csrrabbi/), who reported it privately.
 
 ## [2.1.0]
 
