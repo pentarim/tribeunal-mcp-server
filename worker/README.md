@@ -36,10 +36,43 @@ MCP client ──(mcp-remote / SSE | Streamable HTTP)──▶ Worker
 |---|---|
 | `src/index.ts` | `OAuthProvider` wiring: `apiHandlers` for `/sse` + `/mcp`, Auth0 `defaultHandler`, endpoints, `scopesSupported`, `tokenExchangeCallback`. Re-exports the `TribeunalMCP` Durable Object. |
 | `src/mcp-agent.ts` | `TribeunalMCP extends McpAgent` — registers the shared 46 tools, each routed through a per-user `TribeunalAPIClient` using `this.props.upstreamAccessToken`. |
-| `src/auth0-handler.ts` | Hono app: `/authorize` (consent + Auth0 redirect, PKCE), `/callback` (code → token exchange, `completeAuthorization`), and the `tokenExchangeCallback` (refresh). |
-| `src/oauth-utils.ts` | PKCE (S256), Auth0 authorize-URL / token / refresh helpers, signed client-approval cookie, consent dialog. Web Crypto only — no Node crypto. |
+| `src/auth0-handler.ts` | Hono app: `/authorize` (PKCE check, consent held in KV, Auth0 redirect), `/callback` (browser check, code → token exchange, `completeAuthorization`), and the `tokenExchangeCallback` (refresh). |
+| `src/oauth-utils.ts` | PKCE (S256), Auth0 authorize-URL / token / refresh helpers, cookies (`__Host-` over HTTPS), signed client-approval cookie, consent dialog. Web Crypto only — no Node crypto. |
 | `src/types.ts` | `Env` (= generated `Cloudflare.Env`), `UserProps`, `HonoEnv`. |
 | `wrangler.jsonc` | DO binding `MCP_OBJECT` + migration, KV `OAUTH_KV`, non-secret `vars`, `nodejs_compat`, commented custom-domain block. |
+
+## Client registration and consent
+
+`/register` is open by design. The MCP authorization spec has clients register
+themselves (RFC 7591), so there is no approval step and a client's name and
+redirect URI are whatever the registrant sent. Auth0 is configured to skip its
+own consent for the one upstream application
+(`app/docs/AUTH0_CONTRACT.md`), which makes the Worker's consent screen the only
+place a person agrees to a particular client. Four rules keep that agreement
+real, each pinned by `tests/worker-oauth-consent.test.ts`:
+
+- **PKCE S256 is required.** `/authorize` answers 400 without a `code_challenge`
+  or with the `plain` method, and the metadata advertises `S256` only.
+- **The request is held server-side.** The consent form carries a random token;
+  the request it stands for lives in KV (`consent:<token>`, 10 minutes, single
+  use). Nothing describing the request is read from the form.
+- **An approval counts only from the browser that saw the screen.** The same
+  token is set as a `__Host-mcp-consent-…` cookie and the post must carry both.
+  The page shows the redirect URI, says the client name is unverified, and
+  cannot be framed.
+- **A login finishes only in the browser that started it.** The Auth0 `state`
+  is set as a `__Host-mcp-login-…` cookie and `/callback` requires it back.
+
+Each cookie's name ends with the start of its own token, so two sign-ins open
+in one browser do not overwrite each other.
+
+Over plain HTTP the cookies drop the `__Host-` prefix, because browsers refuse
+it there and `wrangler dev` serves HTTP. They stay `Secure`, which Chrome and
+Firefox accept on `http://localhost`; use one of those for local sign-in.
+Production must not serve HTTP: keep **Always Use HTTPS** on for the zone.
+
+Registrations are not rate-limited by the Worker. If `/register` is abused, add
+a Cloudflare rate-limiting rule for that path.
 
 ## Pinned library versions
 

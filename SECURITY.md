@@ -6,7 +6,7 @@ Please report security issues privately to **pentarim@gmail.com** (subject: `[SE
 
 ## Authentication model
 
-- **Remote server** (`mcp.tribeunal.com`): OAuth 2.1 with PKCE via Auth0. Access tokens are audience-restricted RS256 JWTs validated by the Tribeunal API; every tool call executes as the signed-in user. The Worker holds no shared credentials. OAuth grants are stored in Cloudflare KV; sessions are isolated per Durable Object.
+- **Remote server** (`mcp.tribeunal.com`): OAuth 2.1 with PKCE via Auth0. Access tokens are audience-restricted RS256 JWTs validated by the Tribeunal API; every tool call executes as the signed-in user. The Worker holds no shared credentials. OAuth grants are stored in Cloudflare KV; sessions are isolated per Durable Object. MCP clients register themselves, as the MCP authorization spec expects, so registration is open and a client's name is unverified. Before a new client is connected the server shows a consent screen naming where access is sent; an approval counts only from the browser that was shown that screen, and a sign-in completes only in the browser that started it. PKCE with S256 is required.
 - **Local stdio server** (npm): a personal API key passed as `TRIBEUNAL_API_KEY`, sent as a Bearer token. Keys are stored Argon2ID-hashed server-side, displayed exactly once at generation, and can be rotated or revoked at any time at [tribeunal.com/profile/api-key](https://tribeunal.com/profile/api-key).
 
 ## Rate limits
