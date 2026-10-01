@@ -5,9 +5,14 @@
 // No third-party crypto libs: everything uses Web Crypto (`crypto.subtle`),
 // which is available in the Workers runtime.
 
-import type { AuthRequest, ClientInfo } from '@cloudflare/workers-oauth-provider';
+import type { ClientInfo } from '@cloudflare/workers-oauth-provider';
 
-const COOKIE_NAME = 'mcp-approved-clients';
+// Cookie names, before the `__Host-` prefix `cookieName()` adds. The approval
+// cookie was renamed when the consent flow was hardened, so approvals recorded
+// before that are not honoured and every browser is asked once more.
+const APPROVED_COOKIE = 'mcp-consented-clients';
+const CONSENT_COOKIE = 'mcp-consent';
+const LOGIN_COOKIE = 'mcp-login';
 const ONE_YEAR_IN_SECONDS = 31536000;
 
 // ---------------------------------------------------------------------------
@@ -172,6 +177,67 @@ export function decodeJwtClaims(token: string): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Cookies
+// ---------------------------------------------------------------------------
+
+/**
+ * `__Host-` pins a cookie to this exact host over HTTPS, so a sibling
+ * subdomain cannot set or overwrite it. Browsers refuse the prefix on plain
+ * HTTP, which is what `wrangler dev` serves, so an HTTP request gets the bare
+ * name. `wrangler dev` reports the route's hostname, not `localhost`, which is
+ * why this keys on the scheme. Production should never see HTTP: keep "Always
+ * Use HTTPS" on for the zone.
+ *
+ * `Secure` stays on either way. Chrome and Firefox accept it on
+ * http://localhost; any other plain-HTTP origin drops the cookie and the
+ * sign-in is refused, which is the intended outcome outside local development.
+ */
+function cookieName(request: Request, name: string): string {
+  return new URL(request.url).protocol === 'https:' ? `__Host-${name}` : name;
+}
+
+/** Value of the named cookie on the request, or null. */
+export function readCookie(request: Request, name: string): string | null {
+  const prefix = `${cookieName(request, name)}=`;
+  const target = (request.headers.get('Cookie') ?? '')
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(prefix));
+  return target ? target.substring(prefix.length) : null;
+}
+
+/** A `Set-Cookie` value. Lax, so the cookie survives the redirect back from Auth0. */
+export function setCookie(request: Request, name: string, value: string, maxAgeSeconds: number): string {
+  return `${cookieName(request, name)}=${value}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+export function clearCookie(request: Request, name: string): string {
+  return setCookie(request, name, '', 0);
+}
+
+/**
+ * The cookie that pairs a browser with one consent screen (`consentCookie`) or
+ * one Auth0 login (`loginCookie`). The name carries the start of the token, so
+ * two sign-ins open in one browser each keep their own cookie; the value is the
+ * whole token and is what gets compared.
+ */
+export function consentCookie(token: string): string {
+  return `${CONSENT_COOKIE}-${token.slice(0, 16)}`;
+}
+
+export function loginCookie(state: string): string {
+  return `${LOGIN_COOKIE}-${state.slice(0, 16)}`;
+}
+
+/** Compare two tokens without stopping at the first differing character. */
+export function sameToken(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// ---------------------------------------------------------------------------
 // Cookie-based client approval (so a given MCP client only sees the consent
 // screen once). HMAC-SHA256 signed with COOKIE_ENCRYPTION_KEY.
 // ---------------------------------------------------------------------------
@@ -203,18 +269,10 @@ async function verifySignature(key: CryptoKey, signatureHex: string, data: strin
   }
 }
 
-async function getApprovedClientsFromCookie(
-  cookieHeader: string | null,
-  secret: string,
-): Promise<string[] | null> {
-  if (!cookieHeader) return null;
-  const target = cookieHeader
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith(`${COOKIE_NAME}=`));
-  if (!target) return null;
+async function getApprovedClientsFromCookie(request: Request, secret: string): Promise<string[] | null> {
+  const value = readCookie(request, APPROVED_COOKIE);
+  if (!value) return null;
 
-  const value = target.substring(COOKIE_NAME.length + 1);
   const parts = value.split('.');
   if (parts.length !== 2) return null;
 
@@ -239,46 +297,25 @@ export async function clientIdAlreadyApproved(
   cookieSecret: string,
 ): Promise<boolean> {
   if (!clientId) return false;
-  const approved = await getApprovedClientsFromCookie(request.headers.get('Cookie'), cookieSecret);
+  const approved = await getApprovedClientsFromCookie(request, cookieSecret);
   return approved?.includes(clientId) ?? false;
 }
 
-export interface ParsedApproval {
-  state: { oauthReqInfo?: AuthRequest };
-  headers: Record<string, string>;
-}
-
-/** Parse the approval form POST, returning the decoded state + Set-Cookie. */
-export async function parseRedirectApproval(
+/**
+ * The `Set-Cookie` value that adds `clientId` to this browser's approved list.
+ *
+ * The caller decides WHICH client was approved, from the consent record it
+ * holds server-side. Nothing here is read from the request body.
+ */
+export async function approvedClientsCookie(
   request: Request,
+  clientId: string,
   cookieSecret: string,
-): Promise<ParsedApproval> {
-  if (request.method !== 'POST') throw new Error('Expected POST.');
-
-  const formData = await request.formData();
-  const encodedState = formData.get('state');
-  if (typeof encodedState !== 'string' || !encodedState) {
-    throw new Error("Missing 'state' in form data.");
-  }
-
-  const state = JSON.parse(atob(encodedState)) as { oauthReqInfo?: AuthRequest };
-  const clientId = state?.oauthReqInfo?.clientId;
-  if (!clientId) throw new Error('Could not extract clientId from state.');
-
-  const existing = (await getApprovedClientsFromCookie(request.headers.get('Cookie'), cookieSecret)) || [];
-  const updated = Array.from(new Set([...existing, clientId]));
-
-  const payload = JSON.stringify(updated);
-  const key = await importHmacKey(cookieSecret);
-  const signature = await signData(key, payload);
-  const cookieValue = `${signature}.${btoa(payload)}`;
-
-  return {
-    headers: {
-      'Set-Cookie': `${COOKIE_NAME}=${cookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
-    },
-    state,
-  };
+): Promise<string> {
+  const existing = (await getApprovedClientsFromCookie(request, cookieSecret)) || [];
+  const payload = JSON.stringify(Array.from(new Set([...existing, clientId])));
+  const signature = await signData(await importHmacKey(cookieSecret), payload);
+  return setCookie(request, APPROVED_COOKIE, `${signature}.${btoa(payload)}`, ONE_YEAR_IN_SECONDS);
 }
 
 function sanitizeHtml(unsafe: string): string {
@@ -293,13 +330,26 @@ function sanitizeHtml(unsafe: string): string {
 export interface ApprovalDialogOptions {
   client: ClientInfo | null;
   server: { name: string; description?: string };
-  state: Record<string, unknown>;
+  /** Where the authorization code is sent once the user signs in. */
+  redirectUri: string;
+  /** Opaque handle for the pending request; also set as the consent cookie. */
+  consentToken: string;
+  /** Lifetime of the pending request, seconds. */
+  ttlSeconds: number;
 }
 
-/** Render a minimal, XSS-safe consent screen for first-time MCP clients. */
+/**
+ * Render the consent screen for a first-time MCP client.
+ *
+ * MCP clients register themselves, so the name on this page is whatever the
+ * registrant typed. The page therefore says so, and shows the one thing the
+ * registrant cannot dress up: where access is sent. The form carries only the
+ * consent token, and the same token is set as a cookie so an approval counts
+ * only from the browser that was shown this page. The page may not be framed.
+ * A consent can be approved once, so the button disables itself on submit.
+ */
 export function renderApprovalDialog(request: Request, options: ApprovalDialogOptions): Response {
-  const { client, server, state } = options;
-  const encodedState = btoa(JSON.stringify(state));
+  const { client, server, redirectUri, consentToken, ttlSeconds } = options;
   const serverName = sanitizeHtml(server.name);
   const clientName = client?.clientName ? sanitizeHtml(client.clientName) : 'A new MCP Client';
   const serverDescription = server.description ? sanitizeHtml(server.description) : '';
@@ -313,8 +363,11 @@ export function renderApprovalDialog(request: Request, options: ApprovalDialogOp
   <title>${serverName} | Authorization Request</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background:#f9fafb; color:#333; margin:0; padding:2rem; }
-    .card { max-width:560px; margin:2rem auto; background:#fff; border-radius:8px; box-shadow:0 8px 36px rgba(0,0,0,.1); padding:2rem; }
+    .card { max-width:560px; margin:2rem auto; background:#fff; border-radius:8px; box-shadow:0 8px 36px rgba(0,0,0,.1); padding:2rem; overflow-wrap:anywhere; }
     h1 { font-size:1.3rem; font-weight:600; margin-top:0; }
+    .destination { background:#f3f4f6; border-radius:6px; padding:.75rem 1rem; }
+    .destination code { display:block; margin-top:.25rem; font-size:.95rem; }
+    .notice { font-size:.9rem; color:#555; }
     .actions { display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem; }
     button { padding:.75rem 1.5rem; border-radius:6px; font-size:1rem; font-weight:500; border:none; cursor:pointer; }
     .primary { background:#0070f3; color:#fff; }
@@ -326,8 +379,10 @@ export function renderApprovalDialog(request: Request, options: ApprovalDialogOp
     <h1>${serverName}</h1>
     ${serverDescription ? `<p>${serverDescription}</p>` : ''}
     <p><strong>${clientName}</strong> is requesting access to Tribeunal on your behalf. If you approve, you will be redirected to Auth0 to sign in.</p>
-    <form method="post" action="${action}">
-      <input type="hidden" name="state" value="${encodedState}">
+    <p class="destination">After you sign in, access is sent to:<code>${sanitizeHtml(redirectUri)}</code></p>
+    <p class="notice">The application chose its own name; it is not verified by Tribeunal. Approving lets it act as you: create cases, vote, comment and manage tribes. Approve only if you started this connection yourself and recognise the address above.</p>
+    <form method="post" action="${action}" onsubmit="this.querySelector('.primary').disabled=true">
+      <input type="hidden" name="consent" value="${sanitizeHtml(consentToken)}">
       <div class="actions">
         <button type="button" class="secondary" onclick="window.history.back()">Cancel</button>
         <button type="submit" class="primary">Approve</button>
@@ -337,5 +392,13 @@ export function renderApprovalDialog(request: Request, options: ApprovalDialogOp
 </body>
 </html>`;
 
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  const headers = new Headers({
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': "frame-ancestors 'none'",
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+  });
+  headers.append('Set-Cookie', setCookie(request, consentCookie(consentToken), consentToken, ttlSeconds));
+  return new Response(html, { headers });
 }
