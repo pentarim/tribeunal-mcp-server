@@ -272,7 +272,7 @@ test('15. description length counts code points after canonicalisation', async (
 
 test('16. forbidden characters are refused', async () => {
   const msg = 'description must not contain tabs, control or invisible characters; use spaces and line breaks only';
-  for (const bad of ['\t', '\u200b', '\u202e', '\u2028', '\ue000', '\x7f']) {
+  for (const bad of ['\t', '\u200b', '\u202e', '\u2028', '\ue000', '\x7f', '\ud800', '\udfff']) {
     await refused({ ...VALID, description: `Logo${bad} design, three revisions.` }, msg);
   }
 });

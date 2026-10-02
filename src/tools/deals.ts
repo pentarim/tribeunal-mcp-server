@@ -35,7 +35,8 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const ZERO_RE = /^0x0{40}$/;
 const AMOUNT_RE = /^([0-9]{1,13})(?:\.([0-9]{1,6}))?$/;
 // App\Deal\DealTerms::FORBIDDEN minus \p{Cn}: Node's and PCRE's Unicode tables differ, so the server alone judges unassigned code points.
-const FORBIDDEN_RE = /[\x00-\x09\x0B-\x1F\x7F-\x9F\p{Zl}\p{Zp}\p{Cf}\p{Co}]/u;
+// \p{Cs} adds what the server never sees as text: a lone UTF-16 surrogate is sent as a JSON "\ud800" escape, PHP json_decode turns that into invalid_json (400) before the description is checked, so it is refused here with a field-level message instead. A valid pair such as U+1F600 is one code point and is not matched.
+const FORBIDDEN_RE = /[\x00-\x09\x0B-\x1F\x7F-\x9F\p{Zl}\p{Zp}\p{Cf}\p{Co}\p{Cs}]/u;
 const CLAUSE_RE = /^[0-9]+\./;
 
 /** USDC minor units of a decimal that already matched AMOUNT_RE (App\Deal\UsdcAmount::parse). */
