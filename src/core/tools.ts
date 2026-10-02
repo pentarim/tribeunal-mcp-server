@@ -21,6 +21,17 @@ import {
   HONESTY as DISPUTE_HONESTY,
 } from '../tools/disputes.js';
 
+// Deal request schema, descriptions, honesty row and error/result shaping
+import {
+  DEAL_DESC,
+  DEAL_HEADLINE,
+  CREATE_DEAL_DESCRIPTION,
+  CreateDealSchema,
+  buildDealBody,
+  createDealResult,
+  dealApiError,
+} from '../tools/deals.js';
+
 // Case schemas
 import {
   SearchCasesSchema,
@@ -868,6 +879,25 @@ export const TOOL_DEFINITIONS = [
       required: ['disputeUuid', 'reason'],
     },
   },
+  // Deal tools (1)
+  {
+    name: 'tribeunal_create_deal',
+    title: 'Create deal',
+    annotations: { title: 'Create deal', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: CREATE_DEAL_DESCRIPTION,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        payer: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$', description: DEAL_DESC.payer },
+        payee: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$', description: DEAL_DESC.payee },
+        amount: { type: 'string', pattern: '^[0-9]{1,13}(\\.[0-9]{1,6})?$', description: DEAL_DESC.amount },
+        description: { type: 'string', minLength: 10, maxLength: 2000, description: DEAL_DESC.description },
+        deliveryDays: { type: 'integer', minimum: 2, maximum: 90, description: DEAL_DESC.deliveryDays },
+        panel: { type: 'string', enum: ['fast_track', 'human'], description: DEAL_DESC.panel },
+      },
+      required: ['payer', 'payee', 'amount', 'description', 'deliveryDays', 'panel'],
+    },
+  },
 ] as const;
 
 /** Shape of the value an MCP `tools/call` handler must return. */
@@ -1581,6 +1611,14 @@ export async function dispatchToolCall(
             },
           ],
         };
+      }
+
+      // Deal tools
+      case 'tribeunal_create_deal': {
+        const p = CreateDealSchema.parse(params);
+        const api = await apiClient.createDeal(buildDealBody(p)).catch(dealApiError);
+        const result = createDealResult(api);
+        return { content: [{ type: 'text', text: `${DEAL_HEADLINE}\n\n${JSON.stringify(result, null, 2)}` }] };
       }
 
       default:
