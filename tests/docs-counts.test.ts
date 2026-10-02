@@ -4,21 +4,21 @@ import { test } from 'node:test';
 
 /**
  * The "41 tools" claim is scattered across every doc surface. This pins the
- * whole set to 46 in one place so a future tool count cannot go stale in one
+ * whole set to 47 in one place so a future tool count cannot go stale in one
  * file while the pin in tests/tribe-members.test.ts moves.
  */
 
-const STALE_41 = /41 tools|same 41|the 41/;
+const STALE = /\b4[16] tools|same 4[16]\b|the 4[16]\b|4[16] total|4[16]-tool/;
 
 function read(path: string): string {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 }
 
-test('doc surfaces name 46 tools, not 41', () => {
+test('doc surfaces name 47 tools, not 41 or 46', () => {
   for (const path of ['README.md', 'llms-install.md', 'worker/README.md', 'SUMMARY.md', 'server.json']) {
     const text = read(path);
-    assert.doesNotMatch(text, STALE_41, `${path} still claims the old tool count`);
-    assert.match(text, /46/, `${path} must mention the current tool count, 46`);
+    assert.doesNotMatch(text, STALE, `${path} still claims the old tool count`);
+    assert.match(text, /47/, `${path} must mention the current tool count, 47`);
   }
 });
 
@@ -99,4 +99,60 @@ test('CHANGELOG.md 2.2.0 notes match the spec byte-exactly', () => {
     ),
     'the webhook Changed bullet must name the "Events are owner-scoped" sentence',
   );
+});
+
+test('references/errors.md documents every deal error code', () => {
+  const text = read('skills/using-tribeunal/references/errors.md');
+  assert.ok(text.includes('## Deals'), 'errors.md must gain a ## Deals section');
+  for (const code of [
+    'invalid_json',
+    'deals_unavailable',
+    'deal_daily_limit',
+    'invalid_payer',
+    'invalid_payee',
+    'payee_is_zero',
+    'same_party',
+    'invalid_amount',
+    'amount_out_of_range',
+    'invalid_description',
+    'invalid_delivery_days',
+    'invalid_panel',
+  ]) {
+    assert.ok(text.includes(code), `errors.md must document ${code}`);
+  }
+});
+
+test('CHANGELOG.md 2.2.0 names tribeunal_create_deal and 47 tools', () => {
+  const text = read('CHANGELOG.md');
+  const section = text.slice(0, text.indexOf('## [2.1.0]'));
+  assert.ok(section.includes('**`tribeunal_create_deal`**'), 'the 2.2.0 section must name the deal tool');
+  assert.ok(section.includes('47 tools, up from 41'), 'the 2.2.0 section must say 47 tools, up from 41');
+});
+
+test('the deal skill section names the tool and stays honest', () => {
+  const banned = [
+    /\b(enforc\w*|binding|guarantee\w*|final\w*)\b/i,
+    /\b(protect\w*|safe\w*|secur\w*|insur\w*)\b/i,
+    /Tribeunal (holds|keeps|stores|has) (your|the) money/i,
+  ];
+  const skill = read('skills/arbitrating-a-dispute/SKILL.md');
+  const start = skill.indexOf('## Escrow deal requests');
+  assert.ok(start >= 0, 'arbitrating-a-dispute must gain a ## Escrow deal requests section');
+  const rest = skill.slice(start + 3);
+  const next = rest.indexOf('\n## ');
+  const section = next === -1 ? rest : rest.slice(0, next);
+  for (const phrase of ['tribeunal_create_deal', 'Tribeunal never holds the money', 'It creates a request only.']) {
+    assert.ok(section.includes(phrase), `the deal skill section must contain: ${phrase}`);
+  }
+  const errors = read('skills/using-tribeunal/references/errors.md');
+  const errStart = errors.indexOf('## Deals');
+  const errRest = errors.slice(errStart + 3);
+  const errNext = errRest.indexOf('\n## ');
+  const errSection = errNext === -1 ? errRest : errRest.slice(0, errNext);
+  const changelog = read('CHANGELOG.md');
+  const bulletStart = changelog.indexOf('- **`tribeunal_create_deal`**');
+  const bullet = changelog.slice(bulletStart, changelog.indexOf('\n- ', bulletStart + 3));
+  for (const [label, text] of [['skill section', section], ['errors.md ## Deals', errSection], ['CHANGELOG bullet', bullet]] as const) {
+    for (const re of banned) assert.ok(!re.test(text), `${label} matches ${re}`);
+  }
 });

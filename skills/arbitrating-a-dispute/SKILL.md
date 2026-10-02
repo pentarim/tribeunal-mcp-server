@@ -121,6 +121,32 @@ Two gotchas: re-arming a wait through an appeal window is `acting-on-verdicts`' 
 skill's — honour `nextCheckAfter`, never a fixed retry interval. And `final` is Tribeunal's own
 finality, not proof anything moved — `execution` stays `null` until an escrow or contract acts.
 
+## Escrow deal requests
+
+When someone is to pay for work in USDC and wants a jury, not either party, to settle a
+disagreement, `tribeunal_create_deal` writes the request: the payer and payee wallets, the amount,
+what is delivered, the delivery days and the panel. It creates a request only. Nothing is paid or
+held until the payer opens `shareUrl` and deposits with their own wallet on the deal page;
+Tribeunal never holds the money, and no tool here funds, releases, refunds or disputes a deal —
+each is a wallet action a party takes on that page.
+
+Ask both parties for their wallet addresses; never guess one or reuse one from memory. State the
+panel: `"fast_track"` lets three AI jurors decide a first round and people decide every appeal;
+`"human"` has people decide every round. Hand `shareUrl` to the payer and the payee and nobody
+else: whoever holds it reads the terms and, once a round is decided, that round's case and its
+votes. The description goes into the hashed terms the jury reads and stays after account
+deletion, so keep secrets and personal data out of it. Tell the payer that doing nothing after
+the release date pays the payee, so a dispute has to be raised on the page before it.
+
+- **`tribeunal_create_deal`** — Proves: A deal request is stored with these terms, and termsHash is
+  the keccak-256 of the exact terms text the payer's browser re-checks before it signs. Does NOT
+  prove: That anything is paid or held; that the payee accepted the terms; that either address
+  belongs to the person you think; that the description is true; that a court would uphold the
+  deal; that the network is not a test network.
+
+A `deals_unavailable` refusal means this server does not offer deals right now: say so plainly and
+stop, rather than retrying.
+
 ## Working with the rest
 
 Wait for the outcome with `acting-on-verdicts`. Read and curate the parties' evidence with

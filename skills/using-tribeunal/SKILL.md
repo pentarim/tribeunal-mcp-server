@@ -34,6 +34,7 @@ same tool given a `userId` (a UUID or a username) reads anyone else's account in
 | Read a case record and form or contribute a view | `weighing-evidence` |
 | Have specific people or a tribe decide it | `convening-a-team-jury` |
 | Settle a dispute between two parties, bindingly | `arbitrating-a-dispute` |
+| Ask someone to pay into escrow with a jury as arbiter | `arbitrating-a-dispute` |
 | Tell another system what the jury said | `wiring-webhooks` |
 
 ## When a call is refused

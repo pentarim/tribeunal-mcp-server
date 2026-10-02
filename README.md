@@ -10,7 +10,7 @@ that process: open a case, seat a jury, weigh evidence, vote, and **wait for the
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-com.tribeunal%2Fmcp-blue)](https://registry.modelcontextprotocol.io)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**46 tools · 8 Agent Skills · hosted remote server (OAuth, zero install) · npm package for local use ·
+**47 tools · 8 Agent Skills · hosted remote server (OAuth, zero install) · npm package for local use ·
 [full install guide](https://tribeunal.com/mcp)**
 
 > **Beta** — free to use; standard rate limits apply. Feedback and issues welcome.
@@ -217,7 +217,7 @@ rather than a package.
 
 ## Available tools
 
-All 46 tools carry MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+All 47 tools carry MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint`) so clients can gate confirmations appropriately. 15 are read-only; ten are destructive
 (`delete_case`, `delete_comment`, `delete_tribe`, `delete_webhook`, `remove_tribe_member`, `leave_tribe`,
 `leave_jury`, `close_case`, `revoke_vote`, `cancel_jury_duty`); three are open-world (`create_case`, `update_side_image`, `verify_ruling`).
@@ -302,6 +302,11 @@ timestamped.
   secret cannot be changed here
 - `tribeunal_delete_webhook` — remove an endpoint; stops deliveries and destroys its secret *(destructive)*
 
+### Deals (1)
+- `tribeunal_create_deal` — create an escrow deal request and get a share link for the payer and the
+  payee. A request only: the payer deposits from the deal page with their own wallet, Tribeunal
+  never holds the money, and no tool funds, releases, refunds or disputes a deal
+
 ## Example flows
 
 ### Human-in-the-loop decision: an agent awaits the verdict
@@ -337,6 +342,14 @@ AI: tribeunal_open_dispute (panel "fast_track" or "human") → tribeunal_submit_
     ruling went against you, tribeunal_appeal_ruling before appealDeadline
 ```
 
+### Escrow deal request (2.2.0)
+```
+User: "Ask my client's wallet 0x… to pay my wallet 0x… 150 USDC for the logo, due in 7 days"
+AI: asks for both wallet addresses and the panel → tribeunal_create_deal (panel "fast_track"
+    or "human") → sends shareUrl to the payer and the payee. Nothing is paid until the payer
+    deposits from that page with their own wallet; Tribeunal never holds the money.
+```
+
 ### AI juror: contributing analysis
 ```
 User: "Weigh in on this open case about EV purchase timing"
@@ -353,7 +366,7 @@ the migration table in [`CHANGELOG.md`](./CHANGELOG.md#200) for the old-name →
 ## Architecture
 
 Two transports share one transport-agnostic core (`src/core/tools.ts`, `src/client/api-client.ts`), so
-the 46 tools are byte-identical everywhere:
+the 47 tools are byte-identical everywhere:
 
 - **`worker/`** — the remote server on Cloudflare Workers: Auth0 OAuth 2.1 (PKCE + dynamic client
   registration) via `@cloudflare/workers-oauth-provider`, one Durable Object per session, every call

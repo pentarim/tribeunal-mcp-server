@@ -80,6 +80,22 @@ The lifecycle tools (`update_case`, `delete_case`, `update_comment`, `delete_com
 | `appeal_pool_unconfigured`, `arbiter_unavailable` (503) | Operator configuration — tell a human, do not loop |
 | `ruling_not_found` (404) | Not without a valid decision you may view |
 
+## Deals
+
+`tribeunal_create_deal` wraps every code below as `API Error: <code> (<status>): <message> — <hint>`.
+A refused call creates nothing.
+
+| Code (status) | Retry? |
+| --- | --- |
+| `invalid_payer`, `invalid_payee`, `payee_is_zero`, `same_party` (422) | Only with the wallet address corrected — ask the party, never guess |
+| `invalid_amount`, `invalid_description`, `invalid_delivery_days`, `invalid_panel` (422) | Only with the argument fixed; an unchanged retry cannot work |
+| `amount_out_of_range` (422) | Only with an amount this escrow program accepts; each has its own minimum and maximum, never above 2000 USDC |
+| `invalid_json` (400) | Never — a tool bug, report it |
+| `deal_daily_limit` (429) | Yes, once the rolling 24 h window frees a slot; `limit` is the number of deals allowed per account in that window |
+| `deals_unavailable` (503) | Not in a loop — this server does not offer deals right now; tell a human |
+| `insufficient_scope` (403) with `required_scope: null` | Not over the remote server until it opens deal creation to OAuth sign-ins — use the stdio server with an API key |
+| 404 with no code | Not on this server — it has no deal endpoints yet |
+
 ## The refusals that look like success
 
 These are the expensive ones, because nothing raises an error.
