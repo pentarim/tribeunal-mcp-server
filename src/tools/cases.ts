@@ -41,7 +41,7 @@ export function withCaseDefaults<T extends { visibility?: unknown; juryType?: un
 export const CreateCaseSchema = z.object({
   title: z.string().min(3).max(200).describe('The question or statement to be decided (3-200 characters).'),
   description: z.string().min(10).describe('Context, background and decision criteria (at least 10 characters).'),
-  type: z.enum(['case', 'advice', 'poll']).describe('case (binding jury decision), advice (input for the creator) or poll (opinion gathering) — changes only how the result reads, not the voting mechanics.'),
+  type: z.enum(['case', 'advice', 'poll']).describe('case (a jury decision), advice (input for the creator) or poll (opinion gathering) — changes only how the result reads, not the voting mechanics.'),
   juryType: z.enum(['public', 'invited']).optional().describe('public (anyone) or invited (named jurors only). Omitted, it follows visibility: invited on a private case, public on a public case or a link-poll.'),
   visibility: z.enum(['public', 'private']).optional().describe('private (default: only you, invited jurors and admins) or public (anyone can find and read it). Pairing private with allowsGuestVotes makes a link-poll instead.'),
   sides: z.array(z.object({

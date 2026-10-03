@@ -175,7 +175,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         title: { type: 'string', minLength: 3, maxLength: 200, description: 'The question or statement to be decided (3-200 characters).' },
         description: { type: 'string', minLength: 10, description: 'Context, background and decision criteria (at least 10 characters).' },
-        type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'case (binding jury decision), advice (input for the creator) or poll (opinion gathering) — changes only how the result reads, not the voting mechanics.' },
+        type: { type: 'string', enum: ['case', 'advice', 'poll'], description: 'case (a jury decision), advice (input for the creator) or poll (opinion gathering) — changes only how the result reads, not the voting mechanics.' },
         sides: {
           type: 'array',
           items: {

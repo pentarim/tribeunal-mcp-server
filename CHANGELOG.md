@@ -59,7 +59,8 @@ hint says to tell a human, not to retry in a loop).
   gives no consent and nothing enforces it (`tribeunal_open_dispute` reports enforcement `none` and
   the ruling record carries `bindingBasis: 'advisory'`). The README, the plugin description and the
   skills now say a verdict is sealed, or final on the record, and `arbitrating-a-dispute` says plainly
-  that it is advisory. No tool description changed.
+  that it is advisory. The `tribeunal_create_case` `type` parameter description no longer calls a
+  case binding (it says a jury decision); no other tool description changed.
 - **Skills (deals):** `arbitrating-a-dispute` gains a `## Escrow deal requests` section,
   `using-tribeunal` routes a deal request to it, and `references/errors.md` documents every deal
   error code.
