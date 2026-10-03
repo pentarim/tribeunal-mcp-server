@@ -4,7 +4,9 @@
 
 Five tools for two-party disputes and one that requests an escrow deal: 47 tools, up from 41. They
 need a Tribeunal server with disputes or deals; against an older one they answer 404, and where
-deals are switched off `tribeunal_create_deal` answers 503 `deals_unavailable`.
+deals are switched off `tribeunal_create_deal` answers 503 `deals_unavailable`, as
+`tribeunal_open_dispute` does with 503 `disputes_unavailable` where disputes are switched off (the
+hint says to tell a human, not to retry in a loop).
 
 ### Added
 - **`tribeunal_open_dispute`** — Open a two-party dispute against another Tribeunal account, named by
@@ -53,6 +55,12 @@ deals are switched off `tribeunal_create_deal` answers 503 `deals_unavailable`.
   "Which waiting tool" rows and a re-arm sentence for `tribeunal_await_ruling`;
   `serving-jury-duty` gains a gotcha row for the two new refusals; `references/errors.md` documents
   every dispute error code.
+- **Wording:** a web2 dispute ruling is no longer called binding. It is advisory: the respondent
+  gives no consent and nothing enforces it (`tribeunal_open_dispute` reports enforcement `none` and
+  the ruling record carries `bindingBasis: 'advisory'`). The README, the plugin description and the
+  skills now say a verdict is sealed, or final on the record, and `arbitrating-a-dispute` says plainly
+  that it is advisory. The `tribeunal_create_case` `type` parameter description no longer calls a
+  case binding (it says a jury decision); no other tool description changed.
 - **Skills (deals):** `arbitrating-a-dispute` gains a `## Escrow deal requests` section,
   `using-tribeunal` routes a deal request to it, and `references/errors.md` documents every deal
   error code.

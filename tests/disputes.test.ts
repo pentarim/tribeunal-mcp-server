@@ -589,6 +589,20 @@ test('every §3.5 code is wrapped as "API Error: <code> (<status>): <message> �
   }
 });
 
+test('disputes_unavailable says the server does not offer disputes right now and forbids a retry loop', async () => {
+  const { client } = throwingClient('openDispute', new TribeunalAPIError('boom', 503, { error: 'disputes_unavailable', message: 'Disputes are not available right now.' }));
+  await assert.rejects(
+    () => dispatchToolCall(client, 'tribeunal_open_dispute', OPEN_BASE),
+    (err: Error) => {
+      assert.equal(
+        err.message,
+        'API Error: disputes_unavailable (503): Disputes are not available right now. — this server does not offer disputes right now; tell a human, do not retry in a loop',
+      );
+      return true;
+    },
+  );
+});
+
 test('daily_limit_exceeded names the limit in its hint', async () => {
   const { client } = throwingClient('openDispute', new TribeunalAPIError('boom', 429, { error: 'daily_limit_exceeded', message: 'm', limit: 5 }));
   await assert.rejects(

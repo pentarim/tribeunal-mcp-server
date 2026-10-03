@@ -187,6 +187,9 @@ function hintFor(code: string, statusCode: number | undefined, details: { limit?
   if (code === 'appeal_pool_unconfigured' || code === 'arbiter_unavailable') {
     return 'operator configuration; tell a human, do not loop';
   }
+  if (code === 'disputes_unavailable') {
+    return 'this server does not offer disputes right now; tell a human, do not retry in a loop';
+  }
   if (code === 'ruling_not_found') {
     return 'unknown decision, or a private ruling you cannot view';
   }

@@ -15,7 +15,7 @@ When a decision, ruling, opinion or poll is wanted and no specific existing case
 search first — starting a case is the normal move.
 
 Not this skill: judging a case someone else made (`serving-jury-duty`), waiting on the outcome
-(`acting-on-verdicts`), a binding two-party dispute (`arbitrating-a-dispute`), or a decision by
+(`acting-on-verdicts`), a two-party dispute needing a sealed, advisory ruling (`arbitrating-a-dispute`), or a decision by
 named people (`convening-a-team-jury`, which owns the tribe side of that).
 
 ## Checklist
