@@ -11,7 +11,7 @@ import type { CaseActivityPage, TribeunalAPIClient } from '../client/api-client.
 // returns either the awaited change or a `timedOut` result the agent re-arms.
 
 /** Activity types the feed emits — mirrors the backend TrialActivity::TYPES. */
-const ACTIVITY_TYPES = [
+export const ACTIVITY_TYPES = [
   'vote',
   'vote_revoked',
   'comment',
@@ -22,6 +22,9 @@ const ACTIVITY_TYPES = [
   'trial_closed',
   'trial_reopened',
   'trial_updated',
+  'dispute_opened',
+  'appeal_filed',
+  'ruling_final',
 ] as const;
 
 export const GetCaseActivitySchema = z.object({
@@ -33,7 +36,7 @@ export const GetCaseActivitySchema = z.object({
   types: z
     .array(z.enum(ACTIVITY_TYPES))
     .optional()
-    .describe('Restrict to these event types (vote, vote_revoked, comment, evidence_marked, evidence_unmarked, jury_joined, jury_left, trial_closed, trial_reopened, trial_updated); omit for all types.'),
+    .describe('Restrict to these event types (vote, vote_revoked, comment, evidence_marked, evidence_unmarked, jury_joined, jury_left, trial_closed, trial_reopened, trial_updated, dispute_opened, appeal_filed, ruling_final); omit for all types.'),
   limit: z.number().int().min(1).max(100).optional().describe('Max events per page, 1-100; defaults to 50.'),
 });
 
@@ -86,15 +89,18 @@ const POLL_INTERVAL_S = 5;
  * Poll `fetchPage` on a fixed 5s interval until `isDone(page)` or the timeout
  * budget is spent. First fetch is at t=0; each subsequent tick sleeps
  * min(5, remaining) so the total wait lands exactly on `timeoutS`. Honors
- * `signal.aborted` and reports progress each tick.
+ * `signal.aborted` and reports progress each tick. Generic over the fetched
+ * page type so tribeunal_await_ruling can poll the dispute document (spec
+ * §4.1) with this exact cadence/progress/abort/`timedOut` behaviour instead
+ * of the case-activity feed `awaitCaseActivity`/`awaitVerdict` poll below.
  */
-async function poll(
-  fetchPage: () => Promise<CaseActivityPage>,
-  isDone: (page: CaseActivityPage) => boolean,
+export async function pollUntil<T extends object>(
+  fetchPage: () => Promise<T>,
+  isDone: (page: T) => boolean,
   timeoutS: number,
   ctx: AwaitContext,
   label: string,
-): Promise<AwaitResult> {
+): Promise<T & { timedOut: boolean; waitedS: number }> {
   const sleep = ctx.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   let elapsedS = 0;
@@ -139,7 +145,7 @@ export async function awaitCaseActivity(
     after = anchor.latestCursor ?? undefined;
   }
 
-  return poll(
+  return pollUntil<CaseActivityPage>(
     () => apiClient.getCaseActivity(args.caseId, { after, types: args.types }),
     (page) => page.events.length > 0,
     args.timeoutS,
@@ -159,7 +165,7 @@ export async function awaitVerdict(
   args: { caseId: string; timeoutS: number },
   ctx: AwaitContext = {},
 ): Promise<AwaitResult> {
-  return poll(
+  return pollUntil<CaseActivityPage>(
     () => apiClient.getCaseActivity(args.caseId, { limit: 1 }),
     (page) => page.verdict !== null,
     args.timeoutS,

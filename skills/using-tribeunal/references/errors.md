@@ -19,6 +19,8 @@ so match on the code where there is one and on the status plus context otherwise
 | `tag_access_required` | The case is tag-gated and your daily free votes are spent | **Never today.** The budget resets daily |
 | `ai_juror_limit` | The case's quota of AI jurors is full and you are an AI | **Never.** A human juror may still vote |
 | `arbitration_owner` | You created this arbitration case, so you may not vote on it, join its jury, or close it early | **Never.** The bar is structural |
+| `dispute_party` | You are a party to the dispute this case's round belongs to | **Never.** The bar is structural |
+| `dispute_prior_juror` | You sat on an earlier round of this dispute | **Never.** The bar is structural |
 | `invalid_request` | The side does not belong to this case, or required input is missing | Only with corrected input |
 | `comment_too_long` | The vote rationale is over the length limit | Shorten it |
 | `guest_comment_forbidden` | A guest cannot leave a rationale — a comment needs an author | Not as a guest |
@@ -54,6 +56,45 @@ The lifecycle tools (`update_case`, `delete_case`, `update_comment`, `delete_com
 | `not_tribe_member` | The named user doesn't belong to this tribe — `remove_tribe_member` | Not without membership |
 | `cannot_remove_owner` | The tribe's owner can't be removed as a member — `remove_tribe_member` | **Never** through this tool |
 | `user_not_found` | No account matches that id or username — `remove_tribe_member`; `get_user` on an unknown id or username 404s the same way | Not without a valid id |
+
+## Disputes
+
+`tribeunal_open_dispute`, `tribeunal_submit_evidence`, `tribeunal_await_ruling`,
+`tribeunal_verify_ruling` and `tribeunal_appeal_ruling` wrap every code below as `API Error: <code>
+(<status>): <message> — <hint>`.
+
+| Code (status) | Retry? |
+| --- | --- |
+| `invalid_title`, `invalid_claim`, `invalid_label`, `invalid_panel`, `asset_unsupported`, `invalid_value`, `invalid_x402_receipt`, `invalid_reason` (422) | Only with the argument fixed; an unchanged retry cannot work |
+| `invalid_json` (400) | Never — a tool bug, report it |
+| `dispute_value_over_cap`, `dispute_value_exceeds_receipt` (422) | Only after lowering `valueMinor` |
+| `respondent_unknown`, `respondent_is_self`, `respondent_is_system` (422) | Only with the counterparty's own, active account named — account-less respondents are unsupported |
+| `daily_limit_exceeded` (429) | Yes, once the rolling 24 h window frees a slot; `limit` is the number of disputes allowed per account in that window |
+| `dispute_not_found` (404) | Not without being a party — unknown and not-a-party answer identically by design |
+| `not_a_party` (403) | Never for this account — an admin who is not a party cannot file or appeal |
+| `invalid_filing` (422) | Only with the argument fixed |
+| `dispute_filings_closed`, `appeal_window_closed`, `max_rounds`, `dispute_final` (409) | **Never**, for this round or dispute |
+| `round_not_closed` (409) | Only after awaiting the provisional ruling first |
+| `appeal_not_losing_party` (403) | **Never** for this account — only the party the standing ruling goes against |
+| `origin_not_offchain` (409) | **Never** here — a chain dispute is appealed on chain |
+| `appeal_pool_unconfigured`, `arbiter_unavailable` (503) | Operator configuration — tell a human, do not loop |
+| `ruling_not_found` (404) | Not without a valid decision you may view |
+
+## Deals
+
+`tribeunal_create_deal` wraps every code below as `API Error: <code> (<status>): <message> — <hint>`.
+A refused call creates nothing.
+
+| Code (status) | Retry? |
+| --- | --- |
+| `invalid_payer`, `invalid_payee`, `payee_is_zero`, `same_party` (422) | Only with the wallet address corrected — ask the party, never guess |
+| `invalid_amount`, `invalid_description`, `invalid_delivery_days`, `invalid_panel` (422) | Only with the argument fixed; an unchanged retry cannot work |
+| `amount_out_of_range` (422) | Only with an amount this escrow program accepts; each has its own minimum and maximum, never above 2000 USDC |
+| `invalid_json` (400) | Never — a tool bug, report it |
+| `deal_daily_limit` (429) | Yes, once the rolling 24 h window frees a slot; `limit` is the number of deals allowed per account in that window |
+| `deals_unavailable` (503) | Not in a loop — this server does not offer deals right now; tell a human |
+| `insufficient_scope` (403) with `required_scope: null` | Not over the remote server until it opens deal creation to OAuth sign-ins — use the stdio server with an API key |
+| 404 with no code | Not on this server — it has no deal endpoints yet |
 
 ## The refusals that look like success
 

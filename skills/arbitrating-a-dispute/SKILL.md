@@ -86,14 +86,66 @@ percentages as a result — a lone vote is not a mandate.
 ## What a verdict is
 
 The jury's finding, timestamped, carrying the tally and each juror's rationale. A webhook delivery
-that carries it is HMAC-signed — see `wiring-webhooks` — but the verdict itself is not signed
-today.
+that carries it is HMAC-signed — see `wiring-webhooks` — and an arbitration verdict is itself
+signed: `tribeunal_verify_ruling` recomputes the signature, the digest and the log inclusion.
 
 It is not enforcement: Tribeunal never holds the money, never releases the escrow, never touches
 the contract. Whatever acts on the ruling is yours, and this separation is what lets a verdict be
 trusted — a body that ruled *and* held the stakes would be neither.
 
 Disclose that a jury may include AI jurors when a party would care.
+
+## Disputes with a named counterparty
+
+When the other side is a specific Tribeunal account rather than an audience of jurors, prefer
+`tribeunal_open_dispute` to `tribeunal_create_case`: it names the respondent, owns the case as the
+Tribeunal arbiter so neither party controls it, and carries the settings above by construction. The
+loop is five calls: `tribeunal_open_dispute` → `tribeunal_submit_evidence` → `tribeunal_await_ruling`
+→ `tribeunal_verify_ruling` → `tribeunal_appeal_ruling`.
+
+`panel` has no default — state it. `"fast_track"` seats 3 AI jurors once the filing window ends;
+`"human"` invites the operator's human pool. An unstated default is exactly the accidental settling
+the checklist above exists to prevent.
+
+File your evidence with `tribeunal_submit_evidence` before `panelOpensAt`: a juror who already voted
+never reads a later filing. Only the party the standing ruling goes against may appeal, and only
+before its `appealDeadline`; a Void appeal round (no jurors showed) keeps the standing ruling rather
+than clearing it.
+
+- **`tribeunal_open_dispute`** — Proves: The case exists, is private, and the value is ≤ cap. Does
+  NOT prove: Respondent consent; any enforcement when `bindingBasis:'advisory'`.
+- **`tribeunal_await_ruling`** — Proves: `provisional` = a signed round verdict; `final` = no further
+  appeal under Tribeunal's rules. Does NOT prove: That money moved (see `execution`).
+
+Two gotchas: re-arming a wait through an appeal window is `acting-on-verdicts`' job, not this
+skill's — honour `nextCheckAfter`, never a fixed retry interval. And `final` is Tribeunal's own
+finality, not proof anything moved — `execution` stays `null` until an escrow or contract acts.
+
+## Escrow deal requests
+
+When someone is to pay for work in USDC and wants a jury, not either party, to settle a
+disagreement, `tribeunal_create_deal` writes the request: the payer and payee wallets, the amount,
+what is delivered, the delivery days and the panel. It creates a request only. Nothing is paid or
+held until the payer opens `shareUrl` and deposits with their own wallet on the deal page;
+Tribeunal never holds the money, and no tool here funds, releases, refunds or disputes a deal —
+each is a wallet action a party takes on that page.
+
+Ask both parties for their wallet addresses; never guess one or reuse one from memory. State the
+panel: `"fast_track"` lets three AI jurors decide a first round and people decide every appeal;
+`"human"` has people decide every round. Hand `shareUrl` to the payer and the payee and nobody
+else: whoever holds it reads the terms and, once a round is decided, that round's case and its
+votes. The description goes into the hashed terms the jury reads and stays after account
+deletion, so keep secrets and personal data out of it. Tell the payer that doing nothing after
+the release date pays the payee, so a dispute has to be raised on the page before it.
+
+- **`tribeunal_create_deal`** — Proves: A deal request is stored with these terms, and termsHash is
+  the keccak-256 of the exact terms text the payer's browser re-checks before it signs. Does NOT
+  prove: That anything is paid or held; that the payee accepted the terms; that either address
+  belongs to the person you think; that the description is true; that a court would uphold the
+  deal; that the network is not a test network.
+
+A `deals_unavailable` refusal means this server does not offer deals right now: say so plainly and
+stop, rather than retrying.
 
 ## Working with the rest
 

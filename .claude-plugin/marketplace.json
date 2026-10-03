@@ -9,7 +9,7 @@
       "name": "tribeunal",
       "source": "./",
       "description": "The Tribeunal MCP server plus eight Agent Skills for creating cases, serving jury duty, weighing evidence, arbitrating disputes and wiring webhooks.",
-      "version": "2.1.0"
+      "version": "2.2.0"
     }
   ]
 }

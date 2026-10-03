@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isUuid, caseWithUuidOnly } from '../src/tools/uuid.js';
+import { isUuid, caseWithUuidOnly, disputeUuid } from '../src/tools/uuid.js';
 import { dispatchToolCall } from '../src/core/tools.js';
 import type { TribeunalAPIClient } from '../src/client/api-client.js';
 
@@ -64,4 +64,16 @@ test('tribeunal_get_case output exposes uuid and omits the numeric id', async ()
   assert.equal('id' in parsed, false);
   assert.equal('id' in parsed.sides[0], false);
   assert.equal(parsed.sides[0].uuid, 'side-uuid-1');
+});
+
+test('disputeUuid rejects a non-uuid with a dispute-specific message', () => {
+  const result = disputeUuid('d').safeParse('not-a-uuid');
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.match(result.error.issues[0].message, /Must be a dispute UUID \(the dispute's "uuid" field/);
+  }
+});
+
+test('disputeUuid accepts a canonical UUID', () => {
+  assert.equal(disputeUuid('d').parse(CASE_UUID), CASE_UUID);
 });

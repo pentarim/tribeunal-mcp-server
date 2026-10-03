@@ -1,5 +1,71 @@
 # Tribeunal MCP Server Changelog
 
+## [2.2.0]
+
+Five tools for two-party disputes and one that requests an escrow deal: 47 tools, up from 41. They
+need a Tribeunal server with disputes or deals; against an older one they answer 404, and where
+deals are switched off `tribeunal_create_deal` answers 503 `deals_unavailable`.
+
+### Added
+- **`tribeunal_open_dispute`** — Open a two-party dispute against another Tribeunal account, named by
+  username, for a panel to decide: a private arbitration case owned by the Tribeunal arbiter, so
+  neither party controls it. Proves: The case exists, is private, and the value is ≤ cap. Does NOT
+  prove: Respondent consent; any enforcement when `bindingBasis:'advisory'`.
+- **`tribeunal_submit_evidence`** — File one piece of evidence, text or a settled x402 payment
+  receipt, into a dispute you are a party to. Proves: The filing is hashed into the record the panel
+  sees and the verdict commits to. Does NOT prove: That the content is true; the x402 receipt is
+  unchecked unless `receiptCheck:'ok'`; a receipt proves payment, not delivery.
+- **`tribeunal_await_ruling`** — Block until a dispute you are a party to reaches a ruling, up to
+  timeoutSeconds; returns at once when it already has one. Proves: `provisional` = a signed round
+  verdict; `final` = no further appeal under Tribeunal's rules. Does NOT prove: That money moved (see
+  `execution`).
+- **`tribeunal_verify_ruling`** — Recompute a Tribeunal ruling's proofs instead of trusting the
+  server's word. Proves: Cryptographic consistency against the published signer, the log and
+  optionally the chain. Does NOT prove: Independence (`independent:false`); no witness cosigns the log
+  yet.
+- **`tribeunal_appeal_ruling`** — Appeal the standing ruling of a dispute you are a party to: the
+  server opens the next round as a new, larger, human-only case (5 jurors, then 9) with fresh jurors,
+  never a party or an earlier juror, and carries every earlier filing and verdict digest into its
+  record. Proves: A fresh, larger, human-only round opened. Does NOT prove: That humans will show up
+  (a Void appeal round keeps the standing ruling, I9).
+- **`tribeunal_create_deal`** — Create an escrow deal request: the terms under which a payer wallet
+  pays a payee wallet in USDC for work delivered within deliveryDays, with a Tribeunal jury as
+  arbiter of any dispute. It creates a request only: nothing is paid or held until the payer
+  deposits with their own wallet on the deal page, and Tribeunal never holds the money. Proves: A
+  deal request is stored with these terms, and termsHash is the keccak-256 of the exact terms text
+  the payer's browser re-checks before it signs. Does NOT prove: That anything is paid or held; that
+  the payee accepted the terms; that either address belongs to the person you think; that the
+  description is true; that a court would uphold the deal; that the network is not a test network.
+- `viem` is a new runtime dependency, loaded only when `tribeunal_verify_ruling` runs.
+- Six catalog names: webhooks gain `dispute.opened`, `appeal.filed`, `ruling.final`; activity types
+  gain `dispute_opened`, `appeal_filed`, `ruling_final`.
+
+### Changed
+- **Server instructions** now say arbitration verdicts are signed and point at
+  `tribeunal_verify_ruling`, and shorten the private-case sentence to make room.
+- **`tribeunal_create_webhook`**'s "Events are owner-scoped" sentence now names the dispute events a party
+  (never a bystander) receives.
+- **`tribeunal_cast_vote`** and **`tribeunal_join_jury`** name two new refusals, `dispute_party` and
+  `dispute_prior_juror`, that block a dispute's parties and its earlier-round jurors from a later
+  round's case.
+- **Skills:** `arbitrating-a-dispute` gains a `## Disputes with a named counterparty` section and
+  drops its stale "the verdict itself is not signed today" line; `acting-on-verdicts` gains two
+  "Which waiting tool" rows and a re-arm sentence for `tribeunal_await_ruling`;
+  `serving-jury-duty` gains a gotcha row for the two new refusals; `references/errors.md` documents
+  every dispute error code.
+- **Skills (deals):** `arbitrating-a-dispute` gains a `## Escrow deal requests` section,
+  `using-tribeunal` routes a deal request to it, and `references/errors.md` documents every deal
+  error code.
+
+### Security
+- **Remote server sign-in is hardened** (`mcp.tribeunal.com` only; the npm stdio server is not
+  affected). PKCE with S256 is now required at `/authorize`, and `plain` is no longer advertised. A
+  consent approval counts only from the browser that was shown the consent screen, and a sign-in
+  completes only in the browser that started it. The consent screen shows where access is sent and
+  says the client name is unverified. Approvals recorded before this change are void, so each
+  browser is asked once more. Live on the remote server since 2026-10-01, ahead of this release.
+  Thanks to [MD Rabbi Hossain](https://www.linkedin.com/in/csrrabbi/), who reported it privately.
+
 ## [2.1.0]
 
 No tool was added, removed or renamed: the 41-tool surface of 2.0.0 is unchanged.

@@ -138,14 +138,126 @@ export interface CaseActivityPage {
   verdict: CaseVerdict | null;
 }
 
+/** One round of a dispute — one child case per round (design spec §2.6). */
+export interface DisputeRound {
+  round: number;
+  caseUuid: string;
+  caseUrl: string;
+  state: string;
+  panelMode: 'ai' | 'human';
+  jurorCount: number;
+  minVotes: number;
+  panelOpensAt: string;
+  endsAt: string;
+  appealWindowSeconds: number;
+  filedBy: string | null;
+  decisionUuid: string | null;
+  ruling: 0 | 1 | 2 | null;
+  closedAt: string | null;
+  appealDeadline: string | null;
+}
+
+/** The standing (currently-controlling) ruling and the round it rests on. */
+export interface DisputeStanding {
+  ruling: 0 | 1 | 2;
+  basisRound: number;
+  basisDecisionUuid: string | null;
+}
+
+/** GET /api/disputes/{uuid} and the POST /api/disputes 201 body (design spec §2.6). */
+export interface DisputeDocument {
+  disputeUuid: string;
+  round0CaseUuid: string;
+  origin: 'offchain';
+  panel: 'fast_track' | 'human';
+  enforcement: 'none';
+  consent: 'claimant_only';
+  bindingBasis: 'advisory';
+  viewerRole: string;
+  value: { minor: string; asset: string; decimals: number };
+  valueCapMinor: string;
+  claimant: { username: string; label: string; sideUuid: string; wallet: string | null };
+  respondent: { username: string; label: string; sideUuid: string; wallet: string | null };
+  arbiter: { username: string };
+  rulingIndex: unknown;
+  rounds: DisputeRound[];
+  standing: DisputeStanding | null;
+  final: { at: string | null; ruling: 0 | 1 | 2 | null; decisionUuid: string | null };
+  receiptFiling: unknown;
+  createdAt: string;
+  honesty: unknown;
+}
+
+/** POST /api/disputes/{uuid}/filings 201 body. */
+export interface DisputeFilingResult {
+  filingUuid: string;
+  commentUuid: string;
+  caseUuid: string;
+  round: number;
+  kind: 'text' | 'x402-receipt';
+  contentHash: string;
+  markedBy: string;
+  receiptCheck: null | 'unchecked';
+  inRecord: true;
+}
+
+/**
+ * GET /api/rulings/{uuid} — the public ruling bundle (see the app's
+ * `tools/ruling-verify.mjs`). `tribeunal_await_ruling` reads only
+ * `signatures` (to derive its tri-state `signed`); `tribeunal_verify_ruling`
+ * (Task 5) reads the rest of the bundle to recompute the script's checks.
+ */
+export interface RulingBundle {
+  signatures: unknown[];
+}
+
+/** POST /api/disputes/{uuid}/appeals 201 body. */
+export interface DisputeAppealResult {
+  disputeUuid: string;
+  round: number;
+  caseUuid: string;
+  caseUrl: string;
+  filedBy: string;
+  panelMode: 'human';
+  jurorCount: number;
+  minVotes: number;
+  trialLength: number;
+  endsAt: string;
+  appealWindowSeconds: number;
+  priorRound: { round: number; caseUuid: string; decisionUuid: string | null; ruling: 0 | 1 | 2 | null };
+  standing: DisputeStanding;
+  record: { commentUuid: string; contentHash: string; type: string };
+  invited: number;
+  honesty: unknown;
+}
+
+/** POST /api/deals 201 body (app DealController::create, frozen key order). */
+export interface DealCreateResult {
+  slug: string;
+  url: string;
+  shareUrl: string;
+  termsHash: string;
+}
+
+export interface DealCreateBody {
+  payer: string;
+  payee: string;
+  amount: string;
+  description: string;
+  deliveryDays: number;
+  panel: 'fast_track' | 'human';
+}
+
 export class TribeunalAPIClient {
   private client: AxiosInstance;
   private bearerToken: string | undefined;
   private baseOrigin: string;
+  private baseURL: string;
 
   constructor(config: TribeunalAPIClientConfig) {
     const { baseURL, bearerToken, httpsAgent } = config;
     this.baseOrigin = new URL(baseURL).origin;
+    this.baseURL = baseURL.replace(/\/+$/, '');
     this.bearerToken = bearerToken;
 
     const axiosConfig: Parameters<typeof axios.create>[0] = {
@@ -554,6 +666,80 @@ export class TribeunalAPIClient {
     }
     const response = await this.client.post(`/evidence/${evidenceId}/rate`, body);
     return response.data;
+  }
+
+  // Dispute endpoints (design spec 2026-09-26-agent-dispute-tools §2.6, §3.1).
+  // Every route is under /api like createCase — none uses baseOrigin.
+
+  /** POST /api/disputes — opens a two-party dispute; body per tools/disputes.ts buildOpenBody(). */
+  async openDispute(body: Record<string, unknown>): Promise<DisputeDocument> {
+    const response = await this.client.post('/disputes', body);
+    return response.data as DisputeDocument;
+  }
+
+  /** GET /api/disputes/{uuid} — the current dispute document; 404 dispute_not_found masks both an unknown uuid and a non-party viewer. */
+  async getDispute(uuid: string): Promise<DisputeDocument> {
+    const response = await this.client.get(`/disputes/${uuid}`);
+    return response.data as DisputeDocument;
+  }
+
+  /** POST /api/disputes/{uuid}/filings — {text} xor {x402Receipt}; the arbiter marks it in the same step. */
+  async fileDisputeEvidence(
+    uuid: string,
+    body: { text: string } | { x402Receipt: unknown },
+  ): Promise<DisputeFilingResult> {
+    const response = await this.client.post(`/disputes/${uuid}/filings`, body);
+    return response.data as DisputeFilingResult;
+  }
+
+  /** POST /api/disputes/{uuid}/appeals — {reason}; the calling account appeals as the party itself. */
+  async appealDispute(uuid: string, reason: string): Promise<DisputeAppealResult> {
+    const response = await this.client.post(`/disputes/${uuid}/appeals`, { reason });
+    return response.data as DisputeAppealResult;
+  }
+
+  // Deal endpoints (design spec 2026-10-02-mcp-create-deal-tool).
+
+  /** POST /api/deals — stores a deal REQUEST (intent only; nothing on chain); 201 {slug, url, shareUrl, termsHash}. */
+  async createDeal(body: DealCreateBody): Promise<DealCreateResult> {
+    const response = await this.client.post('/deals', body);
+    return response.data as DealCreateResult;
+  }
+
+  /** GET /api/rulings/{uuid} — the public ruling bundle; `share` appends `?share=` for a private ruling's share token. */
+  async getRulingBundle(uuid: string, share?: string): Promise<RulingBundle> {
+    const params: Record<string, string> = {};
+    if (share) params.share = share;
+    const response = await this.client.get(`/rulings/${uuid}`, { params });
+    return response.data as RulingBundle;
+  }
+
+  /** Absolute bundle URL for a decisionUuid, from this client's own baseURL (e.g. https://tribeunal.test/api/rulings/{uuid}). */
+  rulingBundleUrl(uuid: string): string {
+    return `${this.baseURL}/rulings/${uuid}`;
+  }
+
+  /**
+   * GET {origin}{path} — a well-known document on this client's own host
+   * (e.g. `/.well-known/tribeunal-verdict-signer`). Absolute, so it bypasses
+   * the `/api` baseURL like the vote/join routes do. Tolerant: ANY failure
+   * (404, network error, malformed body) becomes `null`, never a throw —
+   * `tribeunal_verify_ruling` treats a missing well-known as `n/a`, not FAIL.
+   */
+  async getWellKnown(path: string, kind: 'json' | 'text'): Promise<unknown | null> {
+    try {
+      const response = await this.client.get(`${this.baseOrigin}${path}`, {
+        responseType: kind === 'text' ? 'text' : 'json',
+      });
+      return response.data;
+    } catch {
+      return null;
+    }
+  }
+
+  /** This client's own host (e.g. https://tribeunal.test) — never sent credentials beyond it. */
+  get origin(): string {
+    return this.baseOrigin;
   }
 }
 

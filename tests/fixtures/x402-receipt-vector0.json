@@ -1,0 +1,17 @@
+{
+  "_source": "Copied from tribeunal/app tests/Fixtures/dispute/x402-receipt-vectors.json, vector 0 — the app's own CanonicalJson content-hash test vector for an x402 receipt.",
+  "input": {
+    "network": "eip155:1",
+    "transaction": "0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+    "nonce": "0x1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd",
+    "payer": "0x1111111111111111111111111111111111111111",
+    "payTo": "0x2222222222222222222222222222222222222222",
+    "asset": "0x3333333333333333333333333333333333333333",
+    "value": "1000000",
+    "validAfter": "1700000000",
+    "validBefore": "1700003600",
+    "resource": "https://example.com/invoice/123"
+  },
+  "canonical": "{\"asset\":\"0x3333333333333333333333333333333333333333\",\"network\":\"eip155:1\",\"nonce\":\"0x1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd\",\"payTo\":\"0x2222222222222222222222222222222222222222\",\"payer\":\"0x1111111111111111111111111111111111111111\",\"resource\":\"https://example.com/invoice/123\",\"transaction\":\"0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4\",\"type\":\"tribeunal.x402-receipt/1\",\"validAfter\":\"1700000000\",\"validBefore\":\"1700003600\",\"value\":\"1000000\"}",
+  "sha256": "d0811e060a18085e31340cd773756f14c4596a7352d4f543493497d84ec39be9"
+}
