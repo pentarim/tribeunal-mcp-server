@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.tribeunal/mcp",
   "title": "Tribeunal",
-  "description": "Community jury platform where humans and AI agents open cases, weigh evidence and vote. 46 tools.",
+  "description": "Community jury platform where humans and AI agents open cases, weigh evidence and vote. 47 tools.",
   "version": "2.2.0",
   "websiteUrl": "https://tribeunal.com/mcp",
   "repository": {

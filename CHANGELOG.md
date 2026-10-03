@@ -2,8 +2,9 @@
 
 ## [2.2.0]
 
-Five tools for two-party disputes: 46 tools, up from 41. They need a Tribeunal server with disputes;
-against an older one they answer 404.
+Five tools for two-party disputes and one that requests an escrow deal: 47 tools, up from 41. They
+need a Tribeunal server with disputes or deals; against an older one they answer 404, and where
+deals are switched off `tribeunal_create_deal` answers 503 `deals_unavailable`.
 
 ### Added
 - **`tribeunal_open_dispute`** — Open a two-party dispute against another Tribeunal account, named by
@@ -27,6 +28,14 @@ against an older one they answer 404.
   never a party or an earlier juror, and carries every earlier filing and verdict digest into its
   record. Proves: A fresh, larger, human-only round opened. Does NOT prove: That humans will show up
   (a Void appeal round keeps the standing ruling, I9).
+- **`tribeunal_create_deal`** — Create an escrow deal request: the terms under which a payer wallet
+  pays a payee wallet in USDC for work delivered within deliveryDays, with a Tribeunal jury as
+  arbiter of any dispute. It creates a request only: nothing is paid or held until the payer
+  deposits with their own wallet on the deal page, and Tribeunal never holds the money. Proves: A
+  deal request is stored with these terms, and termsHash is the keccak-256 of the exact terms text
+  the payer's browser re-checks before it signs. Does NOT prove: That anything is paid or held; that
+  the payee accepted the terms; that either address belongs to the person you think; that the
+  description is true; that a court would uphold the deal; that the network is not a test network.
 - `viem` is a new runtime dependency, loaded only when `tribeunal_verify_ruling` runs.
 - Six catalog names: webhooks gain `dispute.opened`, `appeal.filed`, `ruling.final`; activity types
   gain `dispute_opened`, `appeal_filed`, `ruling_final`.
@@ -44,6 +53,9 @@ against an older one they answer 404.
   "Which waiting tool" rows and a re-arm sentence for `tribeunal_await_ruling`;
   `serving-jury-duty` gains a gotcha row for the two new refusals; `references/errors.md` documents
   every dispute error code.
+- **Skills (deals):** `arbitrating-a-dispute` gains a `## Escrow deal requests` section,
+  `using-tribeunal` routes a deal request to it, and `references/errors.md` documents every deal
+  error code.
 
 ### Security
 - **Remote server sign-in is hardened** (`mcp.tribeunal.com` only; the npm stdio server is not

@@ -231,6 +231,23 @@ export interface DisputeAppealResult {
   honesty: unknown;
 }
 
+/** POST /api/deals 201 body (app DealController::create, frozen key order). */
+export interface DealCreateResult {
+  slug: string;
+  url: string;
+  shareUrl: string;
+  termsHash: string;
+}
+
+export interface DealCreateBody {
+  payer: string;
+  payee: string;
+  amount: string;
+  description: string;
+  deliveryDays: number;
+  panel: 'fast_track' | 'human';
+}
+
 export class TribeunalAPIClient {
   private client: AxiosInstance;
   private bearerToken: string | undefined;
@@ -679,6 +696,14 @@ export class TribeunalAPIClient {
   async appealDispute(uuid: string, reason: string): Promise<DisputeAppealResult> {
     const response = await this.client.post(`/disputes/${uuid}/appeals`, { reason });
     return response.data as DisputeAppealResult;
+  }
+
+  // Deal endpoints (design spec 2026-10-02-mcp-create-deal-tool).
+
+  /** POST /api/deals — stores a deal REQUEST (intent only; nothing on chain); 201 {slug, url, shareUrl, termsHash}. */
+  async createDeal(body: DealCreateBody): Promise<DealCreateResult> {
+    const response = await this.client.post('/deals', body);
+    return response.data as DealCreateResult;
   }
 
   /** GET /api/rulings/{uuid} — the public ruling bundle; `share` appends `?share=` for a private ruling's share token. */
