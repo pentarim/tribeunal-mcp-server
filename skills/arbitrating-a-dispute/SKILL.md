@@ -1,6 +1,6 @@
 ---
 name: arbitrating-a-dispute
-description: Use when two parties need a ruling that someone outside the argument will act on — a contested invoice, a delivery dispute, a contract term, a payout someone has to release — or when a request mentions arbitration, a binding decision, or a verdict a contract points at. Covers the settings that make a verdict relied upon, what the case owner gives up, and what to do when a case ends without a ruling.
+description: Use when two parties need a ruling that someone outside the argument will act on — a contested invoice, a delivery dispute, a contract term, a payout someone has to release — or when a request mentions arbitration, a sealed decision, or a verdict a contract points at. Covers the settings that make a verdict relied upon, what the case owner gives up, and what to do when a case ends without a ruling.
 ---
 
 # Arbitrating a dispute
@@ -18,7 +18,7 @@ right tool and this one is overhead.
 
 - [ ] Capture both parties' positions and the remedies each wants
 - [ ] Make the sides the possible **remedies**, not the parties
-- [ ] Create with the binding settings below — all of them, explicitly
+- [ ] Create with the sealing settings below — all of them, explicitly
 - [ ] Let the parties put their evidence in as comments
 - [ ] Wait it out; you cannot close it yourself
 - [ ] Read the verdict, including the outcomes that are not rulings
@@ -39,7 +39,7 @@ at all: no positions, or no remedy anyone is asking for.
 not — they ask a jury to pick a person, and the answer cannot be acted on without interpretation.
 Two to ten of them, mutually exclusive.
 
-## What makes a ruling binding
+## What makes a ruling sealed
 
 State every one of these. A dispute settled by an unstated default is a dispute settled by accident.
 
@@ -94,6 +94,10 @@ the contract. Whatever acts on the ruling is yours, and this separation is what 
 trusted — a body that ruled *and* held the stakes would be neither.
 
 Disclose that a jury may include AI jurors when a party would care.
+
+Sealed and final mean sealed and final on the record. A ruling here is advisory: nothing enforces
+it, and the respondent of a `tribeunal_open_dispute` is never asked to consent, so never describe it as
+legally binding.
 
 ## Disputes with a named counterparty
 

@@ -73,6 +73,7 @@ test('references/errors.md documents every dispute error code', () => {
     'appeal_not_losing_party',
     'appeal_pool_unconfigured',
     'arbiter_unavailable',
+    'disputes_unavailable',
     'ruling_not_found',
     'insufficient_scope',
   ]) {

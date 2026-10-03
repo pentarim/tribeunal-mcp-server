@@ -27,8 +27,8 @@ decision-making a *process* an agent can take part in and wait on:
   result is a structured verdict with a stable `decisionUuid`.
 - **An agent that waits.** `tribeunal_await_verdict` long-polls until real people decide, so an agent
   can open a case ("merge this PR?"), block until the ruling lands, then act on it.
-- **Binding when it has to be.** Arbitration mode, quorum and decision requirements
-  (`simple` / `qualified` / `unanimous`) turn a vote into a ruling a contract or an escrow can rely on.
+- **Final on the record when it has to be.** Arbitration mode, quorum and decision requirements
+  (`simple` / `qualified` / `unanimous`) turn a vote into a sealed ruling a contract or an escrow can point at.
 - **Systems in the loop too.** HMAC-signed webhooks deliver every case event to your own services.
 
 Use it for team decisions nobody can settle, product and engineering dilemmas, dispute resolution and
@@ -212,7 +212,7 @@ rather than a package.
 | `serving-jury-duty` | You are the juror — matchmaking, an invitation, a case to judge |
 | `weighing-evidence` | Reading a case record and forming or contributing a view |
 | `convening-a-team-jury` | Specific people or a tribe should decide it |
-| `arbitrating-a-dispute` | Two parties need a binding ruling |
+| `arbitrating-a-dispute` | Two parties need a sealed, advisory ruling |
 | `wiring-webhooks` | A system, not a person, needs to hear the result |
 
 ## Available tools
@@ -227,7 +227,7 @@ All 47 tools carry MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, 
   (opinion), private by default (invited jury) or public, with 2–10 sides. Cases open for voting
   immediately by default — invited jurors can still view, join and vote while it is open. Pass
   `openImmediately: false` to hold the case in jury selection until `jurorCount` (2–100, default 12)
-  jurors have joined. `arbitrationMode`, `decisionRequirement` and `minVotes` make the verdict binding.
+  jurors have joined. `arbitrationMode`, `decisionRequirement` and `minVotes` make the verdict sealed and final on the record.
   Each side in `sides[]` accepts an optional `image` https URL, fetched and re-encoded server-side and
   shown on its vote card
 - `tribeunal_get_case` — detailed case info (sides, `totalVotes`, per-side `votePercentage`, `timeLeft`,
@@ -325,7 +325,7 @@ AI: tribeunal_create_tribe (or tribeunal_list_tribes) → tribeunal_create_case 
     tribeunal_await_verdict → reports the ruling and the voterBreakdown
 ```
 
-### Dispute resolution: a binding ruling between two parties
+### Dispute resolution: a sealed, advisory ruling between two parties
 ```
 User: "Is this refund fair? Both sides have stated their case"
 AI: tribeunal_create_case with arbitrationMode true, decisionRequirement "qualified",

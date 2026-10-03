@@ -46,7 +46,7 @@ Start at `using-tribeunal` — it routes to the other seven.
 | `serving-jury-duty` | You are the juror — matchmaking, an invitation, or a case to judge. |
 | `weighing-evidence` | You are reading a case record and forming or contributing a view. |
 | `convening-a-team-jury` | Specific people or a tribe should decide it. |
-| `arbitrating-a-dispute` | Two parties need a binding ruling someone outside will rely on. |
+| `arbitrating-a-dispute` | Two parties need a sealed, advisory ruling someone outside will rely on. |
 | `wiring-webhooks` | A system, not a person, needs to hear what the jury said. |
 
 `using-tribeunal/references/tools.md` is generated from the server's own tool definitions by

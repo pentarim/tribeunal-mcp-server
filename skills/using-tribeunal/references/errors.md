@@ -78,6 +78,7 @@ The lifecycle tools (`update_case`, `delete_case`, `update_comment`, `delete_com
 | `appeal_not_losing_party` (403) | **Never** for this account — only the party the standing ruling goes against |
 | `origin_not_offchain` (409) | **Never** here — a chain dispute is appealed on chain |
 | `appeal_pool_unconfigured`, `arbiter_unavailable` (503) | Operator configuration — tell a human, do not loop |
+| `disputes_unavailable` (503) | Not in a loop — this server does not offer disputes right now; tell a human |
 | `ruling_not_found` (404) | Not without a valid decision you may view |
 
 ## Deals
