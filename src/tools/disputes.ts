@@ -5,6 +5,7 @@ import type {
   DisputeAppealResult,
   DisputeDocument,
   DisputeFilingResult,
+  DisputeListPage,
   DisputeRound,
   DisputeStanding,
   RulingBundle,
@@ -18,13 +19,14 @@ import { disputeUuid, UUID_RE } from './uuid.js';
 // the cross-round ruling poll and the local content-hash check shared by
 // tribeunal_open_dispute, tribeunal_submit_evidence, tribeunal_await_ruling,
 // tribeunal_verify_ruling and tribeunal_appeal_ruling (design spec
-// 2026-09-26-agent-dispute-tools, §3/§4).
+// 2026-09-26-agent-dispute-tools, §3/§4), plus the two one-shot reads added in
+// 2.3.0, tribeunal_get_dispute and tribeunal_list_disputes.
 
 /** The app's hard value cap, mirrored client-side so an over-cap open never reaches the network (I6). */
 export const DISPUTE_VALUE_CAP_MINOR = '2000000000';
 
 export const DESC = {
-  disputeUuid: "The dispute's uuid (disputeUuid from tribeunal_open_dispute or a dispute.opened webhook) — not a case uuid.",
+  disputeUuid: "The dispute's uuid (disputeUuid from tribeunal_open_dispute, tribeunal_list_disputes or a dispute.opened webhook) — not a case uuid.",
   title: 'The dispute in one line, 3-200 characters; it becomes the title of every round case.',
   claim: 'What was agreed, what happened and what you want, 1-8000 characters. With the filings it is the whole brief the panel reads: name the gaps instead of inventing facts.',
   respondent: 'The counterparty. It must hold a Tribeunal account; it is not asked to consent and is not emailed.',
@@ -52,6 +54,8 @@ export const DESC = {
   bundleUrl: 'A ruling bundle or page URL on this server\'s host (…/api/rulings/{uuid} or …/rulings/{uuid}; a ?share= token is kept). Omit when passing decisionUuid.',
   rpcUrl: 'Optional https JSON-RPC URL of the anchor chain (Base). Enables the anchor check; it receives one public eth_call and never your credentials.',
   reason: 'The ground of the appeal, 1-500 characters on one line. Copied permanently into the next round\'s record: no personal data.',
+  page: '1-based page number; defaults to 1.',
+  limit: 'Disputes per page, 1-100; defaults to 20.',
 } as const;
 
 const HEX64 = /^0x[0-9a-fA-F]{64}$/, ADDR = /^0x[0-9a-fA-F]{40}$/, DEC = /^[0-9]{1,20}$/;
@@ -103,6 +107,13 @@ export const AppealRulingSchema = z.object({
   disputeUuid: disputeUuid(DESC.disputeUuid),
   reason: z.string().transform((s) => s.trim()).pipe(z.string().min(1).max(500)
     .refine((s) => !/\p{Cc}/u.test(s), 'reason must be one line with no control characters')).describe(DESC.reason),
+});
+export const GetDisputeSchema = z.object({
+  disputeUuid: disputeUuid(DESC.disputeUuid),
+});
+export const ListDisputesSchema = z.object({
+  page: z.number().int().min(1).default(1).describe(DESC.page),
+  limit: z.number().int().min(1).max(100).default(20).describe(DESC.limit),
 });
 
 export type X402ReceiptInput = z.infer<typeof X402ReceiptSchema>;
@@ -306,6 +317,67 @@ export function appealResult(api: DisputeAppealResult) {
     appealDeadline: null,
     honesty: HONESTY.appealRuling,
   };
+}
+
+/** tribeunal_get_dispute's result: the dispute document's own keys in its own order, under the row tribeunal_open_dispute returns it with. */
+export function disputeResult(doc: DisputeDocument) {
+  return {
+    disputeUuid: doc.disputeUuid,
+    round0CaseUuid: doc.round0CaseUuid,
+    origin: doc.origin,
+    panel: doc.panel,
+    enforcement: doc.enforcement,
+    consent: doc.consent,
+    bindingBasis: doc.bindingBasis,
+    viewerRole: doc.viewerRole,
+    value: doc.value,
+    valueCapMinor: doc.valueCapMinor,
+    claimant: doc.claimant,
+    respondent: doc.respondent,
+    arbiter: doc.arbiter,
+    rulingIndex: doc.rulingIndex,
+    rounds: doc.rounds,
+    final: doc.final,
+    standing: doc.standing,
+    receiptFiling: doc.receiptFiling,
+    receipts: doc.receipts,
+    createdAt: doc.createdAt,
+    honesty: HONESTY.openDispute,
+  };
+}
+
+/** The latest round, the status tribeunal_await_ruling would report for it, and who is reading. */
+export function disputeHeadline(doc: DisputeDocument): string {
+  const latest = highestRound(doc);
+  return `Dispute ${doc.disputeUuid}: round ${latest.round} (${latest.panelMode}) is ${latest.state}, ruling ${rulingStatus(doc, latest)}; you are viewing as ${doc.viewerRole}.`;
+}
+
+export function listDisputesResult(api: DisputeListPage) {
+  return {
+    disputes: api.items.map((d) => ({
+      disputeUuid: d.disputeUuid,
+      viewerRole: d.viewerRole,
+      claimant: d.claimant,
+      respondent: d.respondent,
+      value: d.value,
+      panel: d.panel,
+      createdAt: d.createdAt,
+      currentRound: d.currentRound,
+    })),
+    page: api.page,
+    limit: api.limit,
+    hasMore: api.hasMore,
+  };
+}
+
+/** An empty first page means the account is a party to nothing; an empty later page proves only that the list ended. */
+export function listDisputesHeadline(result: ReturnType<typeof listDisputesResult>): string {
+  const n = result.disputes.length;
+  if (n === 0) {
+    return result.page === 1 ? 'No disputes on page 1: this account is a party to none.' : `No disputes on page ${result.page}.`;
+  }
+  const next = result.hasMore ? `more on page ${result.page + 1}` : 'no further page';
+  return `${n} dispute${n === 1 ? '' : 's'} on page ${result.page}; ${next}.`;
 }
 
 // awaitRuling() + rulingHeadline() (spec §4.1) — the cross-round ruling poll

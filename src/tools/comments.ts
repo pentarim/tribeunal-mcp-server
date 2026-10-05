@@ -15,7 +15,7 @@ export const ListCommentsSchema = z.object({
 });
 
 export const MarkEvidenceSchema = z.object({
-  kind: z.enum(['comment', 'file']).describe("'comment' to mark a posted comment (ids from tribeunal_list_comments), or 'file' to mark an uploaded case file (case files are uploaded from the case web page — there is no MCP upload tool)."),
+  kind: z.enum(['comment', 'file']).describe("'comment' to mark a posted comment (ids from tribeunal_list_comments), or 'file' to mark an uploaded case file (case files are attached when a case is created on the website; no tool uploads one)."),
   id: commentOrFileUuid('UUID of the comment or case file to mark, matching kind.'),
 });
 

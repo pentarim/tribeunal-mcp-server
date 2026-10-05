@@ -1,5 +1,34 @@
 # Tribeunal MCP Server Changelog
 
+## [2.3.0]
+
+Three read-only tools for disputes and deals: 50 tools, up from 47. Each reads an endpoint the
+server already had, so they need the same Tribeunal server 2.2.0's tools do, and they keep working
+where opening disputes or creating deals is switched off.
+
+### Added
+- **`tribeunal_get_dispute`** — Read one dispute you are a party to, as it stands now: the parties
+  and their labels, the disputed value, every round with its case, panel, state, ruling and appeal
+  deadline, the standing ruling and whether the dispute is final. It never blocks;
+  `tribeunal_await_ruling` is the tool that waits.
+- **`tribeunal_list_disputes`** — List the disputes this account is a party to, as claimant or
+  respondent, newest first. It is how a respondent that subscribed to no webhook finds a dispute
+  opened against it, and how an agent recovers a `disputeUuid` in a new session.
+- **`tribeunal_get_deal`** — Read one escrow deal request by its slug: the hashed terms, both
+  wallets, the amount and dates, and the status Tribeunal's indexer last recorded. The account that
+  created the request reads it with `slug` alone; anyone else also passes `share`, the `?share=`
+  value of the link they were sent. Proves: The stored terms and their hash, and the status
+  Tribeunal's indexer had recorded as of `live.bridge.updatedAt`. Does NOT prove: The state on the
+  network right now (the indexer trails it by minutes, and `live.bridge.stale` true means it has not
+  kept up); that the payee accepted the terms; that either address belongs to the person you think;
+  that the description is true.
+
+### Changed
+- **`tribeunal_open_dispute`**'s description and the shared `disputeUuid` parameter description name
+  `tribeunal_list_disputes` as a way to find a dispute.
+- **`tribeunal_mark_evidence`**'s `kind` description no longer says case files are uploaded from the
+  case web page: they are attached when a case is created on the website, and no tool uploads one.
+
 ## [2.2.0]
 
 Five tools for two-party disputes and one that requests an escrow deal: 47 tools, up from 41. They

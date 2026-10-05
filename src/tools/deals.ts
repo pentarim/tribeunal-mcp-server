@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
 import { TribeunalAPIError } from '../client/api-client.js';
-import type { DealCreateResult } from '../client/api-client.js';
+import type { DealCreateResult, DealDocument } from '../client/api-client.js';
 
 // tribeunal_create_deal — schema, descriptions, honesty row, error wrapping and
 // result shaping (design spec 2026-10-02-mcp-create-deal-tool). The tool creates
 // a deal REQUEST through POST /api/deals; every on-chain step stays a wallet
-// action a party takes on the deal page.
+// action a party takes on the deal page. tribeunal_get_deal (2.3.0) reads one
+// back through GET /api/deals/{slug} and changes nothing either.
 
 /** The app's DisputeValueCap (DISPUTE_MAX_VALUE_MINOR default), mirrored so an over-cap amount never reaches the network. */
 export const DEAL_AMOUNT_CAP_MINOR = 2000000000n;
@@ -18,6 +19,8 @@ export const DEAL_DESC = {
   description: 'What the payee delivers, as plain text, 10-2000 characters. It is copied into the hashed terms: anyone holding the link and every juror can read it, and it survives account deletion, so no secrets or personal data. No tabs, control or invisible characters, and no line that starts with a number and a dot such as "1." (use "-" for lists).',
   deliveryDays: 'Whole days from now until the release date, 2-90. Disputes can be raised only before it; after it, if none was raised, anyone can release the money to the payee. Deposits close earlier than that date; the deal page shows when.',
   panel: '"fast_track": the first round of a dispute is decided by three AI jurors and every appeal round by people. "human": every round is decided by people. Required, no default.',
+  slug: "The deal's slug: the 16 characters after /deals/ in its url or shareUrl (slug from tribeunal_create_deal). Not the whole URL and not a UUID.",
+  share: 'The ?share= value of the shareUrl you were sent: 64 hex characters. Leave it out for a request your own account created; anyone else needs it, and a link the creator has rotated since no longer works.',
 } as const;
 
 export const DEAL_HONESTY = {
@@ -25,11 +28,21 @@ export const DEAL_HONESTY = {
     proves: "A deal request is stored with these terms, and termsHash is the keccak-256 of the exact terms text the payer's browser re-checks before it signs",
     doesNotProve: 'That anything is paid or held; that the payee accepted the terms; that either address belongs to the person you think; that the description is true; that a court would uphold the deal; that the network is not a test network',
   },
+  getDeal: {
+    proves: "The stored terms and their hash, and the status Tribeunal's indexer had recorded as of live.bridge.updatedAt",
+    doesNotProve: 'The state on the network right now (the indexer trails it by minutes, and live.bridge.stale true means it has not kept up); that the payee accepted the terms; that either address belongs to the person you think; that the description is true',
+  },
 } as const;
 
 export const DEAL_HEADLINE = 'Deal request created; nothing is paid or held yet. Send shareUrl to the payer and the payee: the payer deposits from that page with their own wallet.';
 
 export const CREATE_DEAL_DESCRIPTION = "Create an escrow deal request: the terms under which a payer wallet pays a payee wallet in USDC for work delivered within deliveryDays, with a Tribeunal jury as arbiter of any dispute. It creates a request only. Nothing is paid or held until the payer opens shareUrl and deposits with their own browser wallet on the deal page; Tribeunal never holds the money, and no Tribeunal tool can fund, release, refund or dispute a deal, since each is a wallet action a party takes on that page. Send shareUrl to the payer and the payee only; url opens only for the account that created the request. Ask the parties for their wallet addresses (0x + 40 hex, not usernames) and never guess one. description is written into the hashed terms: anyone holding the link and every juror can read it, and it survives account deletion, so put no secrets or personal data in it. If no dispute is raised by the release date (deliveryDays from now), anyone can release the money to the payee. A request cannot be edited or deleted; create a new one to change anything. Refused: 503 deals_unavailable (this server does not offer deals right now: tell a human, do not retry); 429 deal_daily_limit; 422 invalid_payer, invalid_payee, payee_is_zero, same_party, invalid_amount, amount_out_of_range, invalid_description, invalid_delivery_days, invalid_panel; 403 insufficient_scope; 404 on a server with no deal endpoints. Returns {slug, url, shareUrl, termsHash, honesty}. Proves: A deal request is stored with these terms, and termsHash is the keccak-256 of the exact terms text the payer's browser re-checks before it signs. Does NOT prove: That anything is paid or held; that the payee accepted the terms; that either address belongs to the person you think; that the description is true; that a court would uphold the deal; that the network is not a test network";
+
+export const GET_DEAL_DESCRIPTION = `Read one escrow deal request by its slug: the hashed terms, both wallets, the amount and dates, and the status Tribeunal's indexer last recorded. Use it after tribeunal_create_deal to see whether the payer has deposited, or to read a deal whose shareUrl you were sent; it only reads, and no Tribeunal tool can fund, release, refund or dispute a deal. status is awaiting_deposit, expired (the deposit deadline passed with none recorded), funded, disputed, released, refunded, released_after_deadline, executed (a ruling was applied) or timed_out (no ruling in time, so the money was split). It is built from deposits and outcomes the indexer has recorded, which trail the network by minutes; live.bridge.stale true means the indexer has not kept up and the status may be older still. The account that created the request reads it with slug alone; anyone else must also pass share. Refused: 404 deal_not_found (unknown slug, or not yours to read without a current share value: identical by design); 404 with no code on a server with no deal endpoints. Returns {slug, status, chain, terms: {version, text, hash, metaEvidenceUri}, deal: {payer, payee, amountMinor, amount, asset, decimals, releaseAfter, fundBy, createdAt, panel, description}, params, live, onchain, dispute, resolution, viewer: {isCreator}, shareUrl, honesty}; onchain, dispute and resolution are null until a deposit, a dispute or an outcome is recorded, shareUrl is null unless you created the request, and releaseAfter, fundBy and createdAt are unix seconds. Proves: ${DEAL_HONESTY.getDeal.proves}. Does NOT prove: ${DEAL_HONESTY.getDeal.doesNotProve}`;
+
+/** The app's slug alphabet (base32, lower case) and share token (bin2hex of 32 bytes), mirrored so a pasted URL is refused here with a usable message. */
+export const DEAL_SLUG_PATTERN = '^[a-z2-7]{16}$';
+export const DEAL_SHARE_PATTERN = '^[0-9a-f]{64}$';
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const ZERO_RE = /^0x0{40}$/;
@@ -85,6 +98,11 @@ export const CreateDealSchema = CreateDealShape.refine(
 
 export type CreateDealParsed = z.infer<typeof CreateDealSchema>;
 
+export const GetDealSchema = z.object({
+  slug: z.string().regex(new RegExp(DEAL_SLUG_PATTERN), 'slug must be the 16 characters after /deals/ in the deal URL, not the whole URL').describe(DEAL_DESC.slug),
+  share: z.string().regex(new RegExp(DEAL_SHARE_PATTERN), 'share must be the 64 hex characters after ?share= in the shareUrl').optional().describe(DEAL_DESC.share),
+});
+
 /** Body POST /api/deals receives: exactly the six fields, description raw (the server canonicalises and hashes it). */
 export function buildDealBody(p: CreateDealParsed) {
   return { payer: p.payer, payee: p.payee, amount: p.amount, description: p.description, deliveryDays: p.deliveryDays, panel: p.panel };
@@ -92,6 +110,30 @@ export function buildDealBody(p: CreateDealParsed) {
 
 export function createDealResult(api: DealCreateResult) {
   return { slug: api.slug, url: api.url, shareUrl: api.shareUrl, termsHash: api.termsHash, honesty: DEAL_HONESTY.createDeal };
+}
+
+/** tribeunal_get_deal's result: the deal document's own keys in its own order; shareUrl is null for a reader the server did not send it to. */
+export function getDealResult(api: DealDocument) {
+  return {
+    slug: api.slug,
+    status: api.status,
+    chain: api.chain,
+    terms: api.terms,
+    deal: api.deal,
+    params: api.params,
+    live: api.live,
+    onchain: api.onchain,
+    dispute: api.dispute,
+    resolution: api.resolution,
+    viewer: api.viewer,
+    shareUrl: api.shareUrl ?? null,
+    honesty: DEAL_HONESTY.getDeal,
+  };
+}
+
+export function dealHeadline(api: DealDocument): string {
+  const stale = api.live?.bridge?.stale === true ? ' (the indexer is stale, so this may be behind the network)' : '';
+  return `Deal ${api.slug}: ${api.status}, as Tribeunal's indexer last recorded it${stale}.`;
 }
 
 const HINTS: Record<string, string> = {
@@ -106,6 +148,7 @@ const HINTS: Record<string, string> = {
   invalid_delivery_days: 'use a whole number of days from 2 to 90',
   invalid_panel: 'use "fast_track" or "human"',
   deals_unavailable: 'this server does not offer deals right now (not configured, or its escrow check failed); tell a human, do not retry in a loop',
+  deal_not_found: 'unknown slug, or not yours to read: unless your account created the request, pass share, the ?share= value of the shareUrl you were sent (a rotated link no longer works)',
 };
 
 function hintFor(code: string, status: number | undefined, details: { limit?: number; required_scope?: string | null }): string {
@@ -121,7 +164,7 @@ function hintFor(code: string, status: number | undefined, details: { limit?: nu
   return '';
 }
 
-/** Wraps a TribeunalAPIError from POST /api/deals as `<code> (<status>): <message> — <hint>` (the disputeApiError shape); a code-less 404 means a server without deal endpoints. */
+/** Wraps a TribeunalAPIError from a deal route as `<code> (<status>): <message> — <hint>` (the disputeApiError shape); a code-less 404 means a server without deal endpoints. */
 export function dealApiError(e: unknown): never {
   if (!(e instanceof TribeunalAPIError)) throw e;
   const details = (e.details ?? {}) as { error?: unknown; message?: unknown; limit?: number; required_scope?: string | null };

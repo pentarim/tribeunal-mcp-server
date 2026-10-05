@@ -10,11 +10,17 @@ import {
   AwaitRulingSchema,
   VerifyRulingSchema,
   AppealRulingSchema,
+  GetDisputeSchema,
+  ListDisputesSchema,
   buildOpenBody,
   buildFilingBody,
   openResult,
   filingResult,
   appealResult,
+  disputeResult,
+  disputeHeadline,
+  listDisputesResult,
+  listDisputesHeadline,
   awaitRuling,
   localContentHash,
   disputeApiError,
@@ -25,10 +31,16 @@ import {
 import {
   DEAL_DESC,
   DEAL_HEADLINE,
+  DEAL_SLUG_PATTERN,
+  DEAL_SHARE_PATTERN,
   CREATE_DEAL_DESCRIPTION,
+  GET_DEAL_DESCRIPTION,
   CreateDealSchema,
+  GetDealSchema,
   buildDealBody,
   createDealResult,
+  getDealResult,
+  dealHeadline,
   dealApiError,
 } from '../tools/deals.js';
 
@@ -446,7 +458,7 @@ export const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['comment', 'file'], description: "'comment' to mark a posted comment (ids from tribeunal_list_comments), or 'file' to mark an uploaded case file (case files are uploaded from the case web page — there is no MCP upload tool)." },
+        kind: { type: 'string', enum: ['comment', 'file'], description: "'comment' to mark a posted comment (ids from tribeunal_list_comments), or 'file' to mark an uploaded case file (case files are attached when a case is created on the website; no tool uploads one)." },
         id: { type: 'string', pattern: UUID_PATTERN, description: 'UUID of the comment or case file to mark, matching kind.' },
       },
       required: ['kind', 'id'],
@@ -790,12 +802,12 @@ export const TOOL_DEFINITIONS = [
       required: ['webhookId'],
     },
   },
-  // Dispute tools (5)
+  // Dispute tools (7)
   {
     name: 'tribeunal_open_dispute',
     title: 'Open dispute',
     annotations: { title: 'Open dispute', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: "Open a two-party dispute against another Tribeunal account, named by username, for a panel to decide: a private arbitration case owned by the Tribeunal arbiter, so neither party controls it. Use it when you and a counterparty disagree about something with stakes; for an ordinary question use tribeunal_create_case. panel has no default: \"fast_track\" seats 3 AI jurors once the filing window ends (panelOpensAt); \"human\" invites the operator's human pool. valueMinor is capped at 2000 USDC. No funds are held or moved (`enforcement:'none'`). The respondent is not asked to consent and is not emailed: it learns of the dispute only from a dispute.opened webhook it subscribed to or by opening the case, so tell it yourself. Refused: 422 respondent_unknown, respondent_is_self, respondent_is_system, dispute_value_over_cap, dispute_value_exceeds_receipt, invalid_<field>; 429 daily_limit_exceeded; 403 insufficient_scope (create:trials). Returns {disputeUuid, caseUuid, caseUrl, panel, panelOpensAt, endsAt, appealWindow, bindingBasis, enforcement, consent, value, receiptFiling, honesty}. Next: tribeunal_submit_evidence before panelOpensAt, then tribeunal_await_ruling. Proves: The case exists, is private, and the value is ≤ cap. Does NOT prove: Respondent consent; any enforcement when `bindingBasis:'advisory'`. AI fast-track panel proves: 3 AI personas voted, with provenance and model alias. Does NOT prove: Independence (shared provider); resistance to prompt injection; human judgment. **Every AI ruling is appealable to humans**",
+    description: "Open a two-party dispute against another Tribeunal account, named by username, for a panel to decide: a private arbitration case owned by the Tribeunal arbiter, so neither party controls it. Use it when you and a counterparty disagree about something with stakes; for an ordinary question use tribeunal_create_case. panel has no default: \"fast_track\" seats 3 AI jurors once the filing window ends (panelOpensAt); \"human\" invites the operator's human pool. valueMinor is capped at 2000 USDC. No funds are held or moved (`enforcement:'none'`). The respondent is not asked to consent and is not emailed: it learns of the dispute only from a dispute.opened webhook it subscribed to, by opening the case or by calling tribeunal_list_disputes, so tell it yourself. Refused: 422 respondent_unknown, respondent_is_self, respondent_is_system, dispute_value_over_cap, dispute_value_exceeds_receipt, invalid_<field>; 429 daily_limit_exceeded; 403 insufficient_scope (create:trials). Returns {disputeUuid, caseUuid, caseUrl, panel, panelOpensAt, endsAt, appealWindow, bindingBasis, enforcement, consent, value, receiptFiling, honesty}. Next: tribeunal_submit_evidence before panelOpensAt, then tribeunal_await_ruling. Proves: The case exists, is private, and the value is ≤ cap. Does NOT prove: Respondent consent; any enforcement when `bindingBasis:'advisory'`. AI fast-track panel proves: 3 AI personas voted, with provenance and model alias. Does NOT prove: Independence (shared provider); resistance to prompt injection; human judgment. **Every AI ruling is appealable to humans**",
     inputSchema: {
       type: 'object',
       properties: {
@@ -879,7 +891,33 @@ export const TOOL_DEFINITIONS = [
       required: ['disputeUuid', 'reason'],
     },
   },
-  // Deal tools (1)
+  {
+    name: 'tribeunal_get_dispute',
+    title: 'Get dispute',
+    annotations: { title: 'Get dispute', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    description: `Read one dispute you are a party to, as it stands now: the parties and their labels, the disputed value, every round with its case, panel, state, ruling and appeal deadline, the standing ruling and whether the dispute is final. This is the one-shot read and never blocks; to wait for a ruling, or to learn whether you may appeal, use tribeunal_await_ruling. Find a disputeUuid with tribeunal_list_disputes. The claim text is not in this document: it opens the description of the round-0 case, read with tribeunal_get_case and round0CaseUuid. ruling is 0 (void), 1 (claimant) or 2 (respondent), and null while a round is undecided; standing is null until a round has closed. Refused: 404 dispute_not_found (unknown, or not a party: identical by design). Returns {disputeUuid, round0CaseUuid, origin, panel, enforcement, consent, bindingBasis, viewerRole, value, valueCapMinor, claimant, respondent, arbiter, rulingIndex, rounds: [{round, caseUuid, caseUrl, state, panelMode, jurorCount, minVotes, panelOpensAt, endsAt, appealWindowSeconds, filedBy, decisionUuid, ruling, closedAt, appealDeadline}], final: {at, ruling, decisionUuid}, standing: {ruling, basisRound, basisDecisionUuid}, receiptFiling, receipts, createdAt, honesty}. Proves: ${DISPUTE_HONESTY.openDispute.proves}. Does NOT prove: ${DISPUTE_HONESTY.openDispute.doesNotProve}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        disputeUuid: { type: 'string', pattern: UUID_PATTERN, description: DISPUTE_DESC.disputeUuid },
+      },
+      required: ['disputeUuid'],
+    },
+  },
+  {
+    name: 'tribeunal_list_disputes',
+    title: 'List disputes',
+    annotations: { title: 'List disputes', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    description: 'List the disputes this account is a party to, as claimant or respondent, newest first. Use it to find a dispute opened against you (the respondent is not emailed when one is opened) or to recover a disputeUuid in a new session. Each row is a summary of the dispute and its latest round; tribeunal_get_dispute returns the whole document. currentRound.ruling is 0 (void), 1 (claimant) or 2 (respondent), and null while that round is undecided. hasMore true means page + 1 holds more rows. Refused: 400 invalid_pagination. Returns {disputes: [{disputeUuid, viewerRole, claimant: {username, label}, respondent: {username, label}, value: {minor, asset, decimals}, panel, createdAt, currentRound: {round, caseUuid, state, ruling}}], page, limit, hasMore}.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: { type: 'integer', minimum: 1, default: 1, description: DISPUTE_DESC.page },
+        limit: { type: 'integer', minimum: 1, maximum: 100, default: 20, description: DISPUTE_DESC.limit },
+      },
+    },
+  },
+  // Deal tools (2)
   {
     name: 'tribeunal_create_deal',
     title: 'Create deal',
@@ -896,6 +934,20 @@ export const TOOL_DEFINITIONS = [
         panel: { type: 'string', enum: ['fast_track', 'human'], description: DEAL_DESC.panel },
       },
       required: ['payer', 'payee', 'amount', 'description', 'deliveryDays', 'panel'],
+    },
+  },
+  {
+    name: 'tribeunal_get_deal',
+    title: 'Get deal',
+    annotations: { title: 'Get deal', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    description: GET_DEAL_DESCRIPTION,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', pattern: DEAL_SLUG_PATTERN, description: DEAL_DESC.slug },
+        share: { type: 'string', pattern: DEAL_SHARE_PATTERN, description: DEAL_DESC.share },
+      },
+      required: ['slug'],
     },
   },
 ] as const;
@@ -1613,12 +1665,31 @@ export async function dispatchToolCall(
         };
       }
 
+      case 'tribeunal_get_dispute': {
+        const p = GetDisputeSchema.parse(params);
+        const doc = await apiClient.getDispute(p.disputeUuid).catch(disputeApiError);
+        return { content: [{ type: 'text', text: `${disputeHeadline(doc)}\n\n${JSON.stringify(disputeResult(doc), null, 2)}` }] };
+      }
+
+      case 'tribeunal_list_disputes': {
+        const p = ListDisputesSchema.parse(params);
+        const api = await apiClient.listDisputes({ page: p.page, limit: p.limit }).catch(disputeApiError);
+        const result = listDisputesResult(api);
+        return { content: [{ type: 'text', text: `${listDisputesHeadline(result)}\n\n${JSON.stringify(result, null, 2)}` }] };
+      }
+
       // Deal tools
       case 'tribeunal_create_deal': {
         const p = CreateDealSchema.parse(params);
         const api = await apiClient.createDeal(buildDealBody(p)).catch(dealApiError);
         const result = createDealResult(api);
         return { content: [{ type: 'text', text: `${DEAL_HEADLINE}\n\n${JSON.stringify(result, null, 2)}` }] };
+      }
+
+      case 'tribeunal_get_deal': {
+        const p = GetDealSchema.parse(params);
+        const api = await apiClient.getDeal(p.slug, p.share).catch(dealApiError);
+        return { content: [{ type: 'text', text: `${dealHeadline(api)}\n\n${JSON.stringify(getDealResult(api), null, 2)}` }] };
       }
 
       default:

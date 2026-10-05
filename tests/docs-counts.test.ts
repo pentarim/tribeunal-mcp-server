@@ -4,21 +4,21 @@ import { test } from 'node:test';
 
 /**
  * The "41 tools" claim is scattered across every doc surface. This pins the
- * whole set to 47 in one place so a future tool count cannot go stale in one
+ * whole set to 50 in one place so a future tool count cannot go stale in one
  * file while the pin in tests/tribe-members.test.ts moves.
  */
 
-const STALE = /\b4[16] tools|same 4[16]\b|the 4[16]\b|4[16] total|4[16]-tool/;
+const STALE = /\b4[167] tools|same 4[167]\b|the 4[167]\b|4[167] total|4[167]-tool/;
 
 function read(path: string): string {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 }
 
-test('doc surfaces name 47 tools, not 41 or 46', () => {
+test('doc surfaces name 50 tools, not 41, 46 or 47', () => {
   for (const path of ['README.md', 'llms-install.md', 'worker/README.md', 'SUMMARY.md', 'server.json']) {
     const text = read(path);
     assert.doesNotMatch(text, STALE, `${path} still claims the old tool count`);
-    assert.match(text, /47/, `${path} must mention the current tool count, 47`);
+    assert.match(text, /\b50\b/, `${path} must mention the current tool count, 50`);
   }
 });
 
@@ -81,10 +81,43 @@ test('references/errors.md documents every dispute error code', () => {
   }
 });
 
-test('CHANGELOG.md opens with the 2.2.0 release', () => {
+test('CHANGELOG.md opens with the 2.3.0 release', () => {
   const text = read('CHANGELOG.md');
   const firstRelease = text.split('\n').find((line) => /^## \[/.test(line));
-  assert.equal(firstRelease, '## [2.2.0]', 'the newest release section must be 2.2.0');
+  assert.equal(firstRelease, '## [2.3.0]', 'the newest release section must be 2.3.0');
+});
+
+test('CHANGELOG.md 2.3.0 names the three read tools and 50 tools', () => {
+  const text = read('CHANGELOG.md');
+  const section = text.slice(0, text.indexOf('## [2.2.0]'));
+  for (const name of ['tribeunal_get_dispute', 'tribeunal_list_disputes', 'tribeunal_get_deal']) {
+    assert.ok(section.includes(`**\`${name}\`**`), `the 2.3.0 section must name ${name}`);
+  }
+  assert.ok(section.includes('50 tools, up from 47'), 'the 2.3.0 section must say 50 tools, up from 47');
+});
+
+test('README.md and llms-install.md count 18 read-only tools', () => {
+  for (const path of ['README.md', 'llms-install.md']) {
+    assert.ok(read(path).includes('18 are read-only'), `${path} must count 18 read-only tools`);
+  }
+});
+
+test('README.md lists every dispute and deal tool under Available tools', () => {
+  const text = read('README.md');
+  const tools = text.slice(text.indexOf('## Available tools'), text.indexOf('## Example flows'));
+  for (const name of [
+    'tribeunal_open_dispute', 'tribeunal_submit_evidence', 'tribeunal_await_ruling', 'tribeunal_verify_ruling',
+    'tribeunal_appeal_ruling', 'tribeunal_get_dispute', 'tribeunal_list_disputes', 'tribeunal_create_deal', 'tribeunal_get_deal',
+  ]) {
+    assert.ok(tools.includes(`\`${name}\``), `README.md Available tools must list ${name}`);
+  }
+});
+
+test('references/errors.md documents the read refusals', () => {
+  const text = read('skills/using-tribeunal/references/errors.md');
+  for (const code of ['deal_not_found', 'invalid_pagination']) {
+    assert.ok(text.includes(code), `errors.md must document ${code}`);
+  }
 });
 
 test('CHANGELOG.md 2.2.0 notes match the spec byte-exactly', () => {
@@ -125,7 +158,7 @@ test('references/errors.md documents every deal error code', () => {
 
 test('CHANGELOG.md 2.2.0 names tribeunal_create_deal and 47 tools', () => {
   const text = read('CHANGELOG.md');
-  const section = text.slice(0, text.indexOf('## [2.1.0]'));
+  const section = text.slice(text.indexOf('## [2.2.0]'), text.indexOf('## [2.1.0]'));
   assert.ok(section.includes('**`tribeunal_create_deal`**'), 'the 2.2.0 section must name the deal tool');
   assert.ok(section.includes('47 tools, up from 41'), 'the 2.2.0 section must say 47 tools, up from 41');
 });
