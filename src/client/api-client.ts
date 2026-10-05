@@ -184,8 +184,29 @@ export interface DisputeDocument {
   standing: DisputeStanding | null;
   final: { at: string | null; ruling: 0 | 1 | 2 | null; decisionUuid: string | null };
   receiptFiling: unknown;
+  receipts: unknown;
   createdAt: string;
   honesty: unknown;
+}
+
+/** One GET /api/disputes row: a summary of the dispute and its latest round, never the full document. */
+export interface DisputeListItem {
+  disputeUuid: string;
+  viewerRole: string;
+  claimant: { username: string | null; label: string };
+  respondent: { username: string | null; label: string };
+  value: { minor: string; asset: string; decimals: number };
+  panel: 'fast_track' | 'human';
+  createdAt: string;
+  currentRound: { round: number; caseUuid: string; state: string; ruling: 0 | 1 | 2 | null };
+}
+
+/** GET /api/disputes 200 body: the caller's own disputes, newest first. */
+export interface DisputeListPage {
+  items: DisputeListItem[];
+  page: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 /** POST /api/disputes/{uuid}/filings 201 body. */
@@ -246,6 +267,22 @@ export interface DealCreateBody {
   description: string;
   deliveryDays: number;
   panel: 'fast_track' | 'human';
+}
+
+/** GET /api/deals/{slug} 200 body (app DealController::show, frozen key order); `shareUrl` is sent to the creator or an admin only. */
+export interface DealDocument {
+  slug: string;
+  status: string;
+  chain: unknown;
+  terms: unknown;
+  deal: unknown;
+  params: unknown;
+  live: { bridge?: { stale?: boolean } };
+  onchain: unknown;
+  dispute: unknown;
+  resolution: unknown;
+  viewer: unknown;
+  shareUrl?: string;
 }
 
 export class TribeunalAPIClient {
@@ -683,6 +720,12 @@ export class TribeunalAPIClient {
     return response.data as DisputeDocument;
   }
 
+  /** GET /api/disputes — the caller's own disputes as claimant or respondent, newest first. */
+  async listDisputes(params: { page: number; limit: number }): Promise<DisputeListPage> {
+    const response = await this.client.get('/disputes', { params });
+    return response.data as DisputeListPage;
+  }
+
   /** POST /api/disputes/{uuid}/filings — {text} xor {x402Receipt}; the arbiter marks it in the same step. */
   async fileDisputeEvidence(
     uuid: string,
@@ -704,6 +747,14 @@ export class TribeunalAPIClient {
   async createDeal(body: DealCreateBody): Promise<DealCreateResult> {
     const response = await this.client.post('/deals', body);
     return response.data as DealCreateResult;
+  }
+
+  /** GET /api/deals/{slug} — the deal document; `share` appends `?share=` for a reader who did not create the request. 404 deal_not_found masks unknown, malformed, ungranted and rotated-away alike. */
+  async getDeal(slug: string, share?: string): Promise<DealDocument> {
+    const params: Record<string, string> = {};
+    if (share) params.share = share;
+    const response = await this.client.get(`/deals/${slug}`, { params });
+    return response.data as DealDocument;
   }
 
   /** GET /api/rulings/{uuid} — the public ruling bundle; `share` appends `?share=` for a private ruling's share token. */

@@ -107,6 +107,11 @@ Tribeunal arbiter so neither party controls it, and carries the settings above b
 loop is five calls: `tribeunal_open_dispute` → `tribeunal_submit_evidence` → `tribeunal_await_ruling`
 → `tribeunal_verify_ruling` → `tribeunal_appeal_ruling`.
 
+Two reads sit beside the loop. `tribeunal_list_disputes` lists the disputes you are a party to: it is
+how a respondent that subscribed to no webhook finds one opened against it, and how you recover a
+`disputeUuid` in a new session. `tribeunal_get_dispute` returns one dispute's parties, rounds and
+standing ruling at once, without waiting for anything.
+
 `panel` has no default — state it. `"fast_track"` seats 3 AI jurors once the filing window ends;
 `"human"` invites the operator's human pool. An unstated default is exactly the accidental settling
 the checklist above exists to prevent.
@@ -141,6 +146,11 @@ else: whoever holds it reads the terms and, once a round is decided, that round'
 votes. The description goes into the hashed terms the jury reads and stays after account
 deletion, so keep secrets and personal data out of it. Tell the payer that doing nothing after
 the release date pays the payee, so a dispute has to be raised on the page before it.
+
+`tribeunal_get_deal` reads a request back: its terms and the status Tribeunal's indexer last
+recorded, which stays `awaiting_deposit` until the payer's deposit is recorded, minutes after it
+lands. The account that created the request reads it by `slug`; anyone else also passes the
+`share` value from the link they were sent.
 
 - **`tribeunal_create_deal`** — Proves: A deal request is stored with these terms, and termsHash is
   the keccak-256 of the exact terms text the payer's browser re-checks before it signs. Does NOT

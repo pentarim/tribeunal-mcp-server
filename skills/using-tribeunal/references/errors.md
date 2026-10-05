@@ -60,8 +60,8 @@ The lifecycle tools (`update_case`, `delete_case`, `update_comment`, `delete_com
 ## Disputes
 
 `tribeunal_open_dispute`, `tribeunal_submit_evidence`, `tribeunal_await_ruling`,
-`tribeunal_verify_ruling` and `tribeunal_appeal_ruling` wrap every code below as `API Error: <code>
-(<status>): <message> — <hint>`.
+`tribeunal_verify_ruling`, `tribeunal_appeal_ruling`, `tribeunal_get_dispute` and
+`tribeunal_list_disputes` wrap every code below as `API Error: <code> (<status>): <message> — <hint>`.
 
 | Code (status) | Retry? |
 | --- | --- |
@@ -80,11 +80,12 @@ The lifecycle tools (`update_case`, `delete_case`, `update_comment`, `delete_com
 | `appeal_pool_unconfigured`, `arbiter_unavailable` (503) | Operator configuration — tell a human, do not loop |
 | `disputes_unavailable` (503) | Not in a loop — this server does not offer disputes right now; tell a human |
 | `ruling_not_found` (404) | Not without a valid decision you may view |
+| `invalid_pagination` (400) | Only with the argument fixed: `page` from 1, `limit` 1-100 |
 
 ## Deals
 
-`tribeunal_create_deal` wraps every code below as `API Error: <code> (<status>): <message> — <hint>`.
-A refused call creates nothing.
+`tribeunal_create_deal` and `tribeunal_get_deal` wrap every code below as `API Error: <code>
+(<status>): <message> — <hint>`. A refused call creates nothing.
 
 | Code (status) | Retry? |
 | --- | --- |
@@ -94,6 +95,7 @@ A refused call creates nothing.
 | `invalid_json` (400) | Never — a tool bug, report it |
 | `deal_daily_limit` (429) | Yes, once the rolling 24 h window frees a slot; `limit` is the number of deals allowed per account in that window |
 | `deals_unavailable` (503) | Not in a loop — this server does not offer deals right now; tell a human |
+| `deal_not_found` (404) | Only with a slug that exists and, unless your account created the request, the current `share` value from its link — unknown, not yours to read and rotated-away answer identically by design |
 | `insufficient_scope` (403) with `required_scope: null` | Not over the remote server until it opens deal creation to OAuth sign-ins — use the stdio server with an API key |
 | 404 with no code | Not on this server — it has no deal endpoints yet |
 

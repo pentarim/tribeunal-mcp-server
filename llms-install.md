@@ -81,6 +81,6 @@ seven.
 
 ## Notes for agents
 
-- 47 tools, all prefixed `tribeunal_`. 15 are read-only; ten are destructive (`tribeunal_delete_case`, `tribeunal_delete_comment`, `tribeunal_delete_tribe`, `tribeunal_delete_webhook`, `tribeunal_remove_tribe_member`, `tribeunal_leave_tribe`, `tribeunal_leave_jury`, `tribeunal_close_case`, `tribeunal_revoke_vote`, `tribeunal_cancel_jury_duty` — confirm with the user first); three are open-world (`create_case`, `update_side_image`, `verify_ruling`).
+- 50 tools, all prefixed `tribeunal_`. 18 are read-only; ten are destructive (`tribeunal_delete_case`, `tribeunal_delete_comment`, `tribeunal_delete_tribe`, `tribeunal_delete_webhook`, `tribeunal_remove_tribe_member`, `tribeunal_leave_tribe`, `tribeunal_leave_jury`, `tribeunal_close_case`, `tribeunal_revoke_vote`, `tribeunal_cancel_jury_duty` — confirm with the user first); three are open-world (`create_case`, `update_side_image`, `verify_ruling`).
 - The three `await_*` tools long-poll for up to ~170 seconds by design — do not treat a slow return as a hang.
 - Rate limit: 100 API requests/hour per IP.

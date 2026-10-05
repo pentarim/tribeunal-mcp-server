@@ -840,10 +840,10 @@ test('a tampered bundle still returns a normal result — ok:false, 1 FAIL, neve
   assert.equal(byName(result.checks as CheckResult[], 'digest').result, 'FAIL');
 });
 
-test('annotation totals: 47 tools, 15 read-only, 10 destructive, 3 open-world', () => {
-  assert.equal(TOOL_DEFINITIONS.length, 47);
+test('annotation totals: 50 tools, 18 read-only, 10 destructive, 3 open-world', () => {
+  assert.equal(TOOL_DEFINITIONS.length, 50);
   const readOnly = TOOL_DEFINITIONS.filter((d) => (d.annotations as { readOnlyHint?: boolean }).readOnlyHint === true);
-  assert.equal(readOnly.length, 15, 'expected 15 readOnlyHint:true tools');
+  assert.equal(readOnly.length, 18, 'expected 18 readOnlyHint:true tools');
   const destructive = TOOL_DEFINITIONS.filter((d) => (d.annotations as { destructiveHint?: boolean }).destructiveHint === true);
   assert.equal(destructive.length, 10, 'expected 10 destructiveHint:true tools');
   const openWorld = TOOL_DEFINITIONS

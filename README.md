@@ -10,7 +10,7 @@ that process: open a case, seat a jury, weigh evidence, vote, and **wait for the
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-com.tribeunal%2Fmcp-blue)](https://registry.modelcontextprotocol.io)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**47 tools · 8 Agent Skills · hosted remote server (OAuth, zero install) · npm package for local use ·
+**50 tools · 8 Agent Skills · hosted remote server (OAuth, zero install) · npm package for local use ·
 [full install guide](https://tribeunal.com/mcp)**
 
 > **Beta** — free to use; standard rate limits apply. Feedback and issues welcome.
@@ -217,8 +217,8 @@ rather than a package.
 
 ## Available tools
 
-All 47 tools carry MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
-`openWorldHint`) so clients can gate confirmations appropriately. 15 are read-only; ten are destructive
+All 50 tools carry MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+`openWorldHint`) so clients can gate confirmations appropriately. 18 are read-only; ten are destructive
 (`delete_case`, `delete_comment`, `delete_tribe`, `delete_webhook`, `remove_tribe_member`, `leave_tribe`,
 `leave_jury`, `close_case`, `revoke_vote`, `cancel_jury_duty`); three are open-world (`create_case`, `update_side_image`, `verify_ruling`).
 
@@ -302,10 +302,26 @@ timestamped.
   secret cannot be changed here
 - `tribeunal_delete_webhook` — remove an endpoint; stops deliveries and destroys its secret *(destructive)*
 
-### Deals (1)
+### Disputes (7)
+- `tribeunal_open_dispute` — open a two-party dispute against a named counterparty: a private
+  arbitration case owned by the Tribeunal arbiter, so neither party controls it
+- `tribeunal_submit_evidence` — file text or a settled x402 receipt into the record the panel reads
+- `tribeunal_await_ruling` — block for a dispute's ruling across appeal rounds
+- `tribeunal_verify_ruling` — recompute a ruling's signature, log inclusion and anchor instead of
+  trusting the server's word
+- `tribeunal_appeal_ruling` — open the next, larger, human-only round before the appeal deadline
+- `tribeunal_get_dispute` — read one dispute as it stands now (parties, every round, the standing
+  ruling) without blocking
+- `tribeunal_list_disputes` — the disputes you are a party to, newest first: how a respondent finds
+  one opened against it
+
+### Deals (2)
 - `tribeunal_create_deal` — create an escrow deal request and get a share link for the payer and the
   payee. A request only: the payer deposits from the deal page with their own wallet, Tribeunal
   never holds the money, and no tool funds, releases, refunds or disputes a deal
+- `tribeunal_get_deal` — read a deal request back: its hashed terms and the status Tribeunal's
+  indexer last recorded, which trails the network. The creator reads by slug; anyone else also
+  passes the share value from the link they were sent
 
 ## Example flows
 
@@ -366,7 +382,7 @@ the migration table in [`CHANGELOG.md`](./CHANGELOG.md#200) for the old-name →
 ## Architecture
 
 Two transports share one transport-agnostic core (`src/core/tools.ts`, `src/client/api-client.ts`), so
-the 47 tools are byte-identical everywhere:
+the 50 tools are byte-identical everywhere:
 
 - **`worker/`** — the remote server on Cloudflare Workers: Auth0 OAuth 2.1 (PKCE + dynamic client
   registration) via `@cloudflare/workers-oauth-provider`, one Durable Object per session, every call
